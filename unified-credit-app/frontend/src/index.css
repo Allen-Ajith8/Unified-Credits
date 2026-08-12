@@ -1,0 +1,80 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-sapphire: #0F2350;
+  --color-teal: #006A67;
+  --color-amethyst: #4A2C76;
+  --color-gold: #D4AF37;
+  --color-pearl: #F4F5F7;
+}
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: local('SF Pro Display'), local('SFProDisplay-Regular'), local('-apple-system');
+  font-weight: 400;
+  font-style: normal;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-pearl);
+  color: var(--color-sapphire);
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 35, 80, 0.15); /* Sapphire with opacity */
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 35, 80, 0.3);
+}
+
+/* Hide scrollbar for carousel */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphism Utilities tailored for the new palette */
+.glass {
+  background: rgba(244, 245, 247, 0.6); /* Pearl */
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(15, 35, 80, 0.1); /* Sapphire border */
+}
+
+.glass-subtle {
+  background: rgba(244, 245, 247, 0.4);
+  backdrop-filter: blur(15px) saturate(120%);
+  -webkit-backdrop-filter: blur(15px) saturate(120%);
+  border: 1px solid rgba(15, 35, 80, 0.05);
+}
+
+.glass-dark {
+  background: rgba(15, 35, 80, 0.8); /* Sapphire */
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}

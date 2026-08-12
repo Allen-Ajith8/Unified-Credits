@@ -1,0 +1,26 @@
+# Node.js
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+
+# IDEs and environments
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+unified-credit-app/frontend/node_modules/
+unified-credit-app/frontend/dist/
+unified-credit-app/backend/__pycache__/
