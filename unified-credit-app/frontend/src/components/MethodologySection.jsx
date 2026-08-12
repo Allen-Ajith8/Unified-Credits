@@ -2,12 +2,15 @@ import React, { useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { ChevronLeft, ChevronRight, Workflow, Network, ShieldCheck } from 'lucide-react';
+import { engineMetrics } from '../data/dashboardMetrics';
 
-const MethodologySection = () => {
+const MethodologySection = ({ activeMode }) => {
   const scrollRef = useRef(null);
   const sectionRef = useRef(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
   const [activeIndex, setActiveIndex] = useState(0);
+
+  const activeData = activeMode === 'c' ? engineMetrics.b : engineMetrics[activeMode]; // Default to b for comparison mode methodology
 
   const radarData = [
     { subject: 'Savings Bal', A: 120, fullMark: 150 },
@@ -18,27 +21,19 @@ const MethodologySection = () => {
     { subject: 'Overdraft', A: 65, fullMark: 150 },
   ];
 
-  const weightsData = [
-    { name: 'Cluster Coeff', weight: 0.607 },
-    { name: 'Credit Score', weight: -0.520 },
-    { name: 'Credit Util', weight: 0.450 },
-    { name: 'Savings Bal', weight: -0.410 },
-    { name: 'Past Defaults', weight: 0.380 },
-    { name: 'Salary Reg', weight: -0.350 },
-    { name: 'EMI Bounce', weight: 0.320 },
-  ];
+  const weightsData = activeData.featureWeights;
 
   const pillars = [
     {
       num: '001',
       icon: <Workflow className="w-7 h-7" />,
-      title: 'Unified Cash Flow Engine',
-      subtitle: 'Dual Data Stream Integration',
-      desc: 'Merging historical external credit data (payment streaks, bureau scores) with real-time internal banking behavior — Average Monthly Balance, salary consistency, fixed obligations.',
+      title: activeData.methodology.title,
+      subtitle: activeData.methodology.steps[0],
+      desc: activeData.methodology.description,
       highlights: [
-        { label: 'External Features', value: '28' },
-        { label: 'Internal Features', value: '23' },
-        { label: 'Network Features', value: '5' },
+        { label: 'Feature Count', value: activeMode === 'b' || activeMode === 'c' ? '60+' : '28' },
+        { label: 'Model Core', value: 'XGBoost' },
+        { label: 'Network Info', value: activeMode === 'b' || activeMode === 'c' ? 'Included' : 'None' },
       ],
       chart: (
         <ResponsiveContainer width="100%" height="100%">
@@ -54,13 +49,12 @@ const MethodologySection = () => {
     {
       num: '002',
       icon: <Network className="w-7 h-7" />,
-      title: 'Multi-View Relational Network',
-      subtitle: 'Graph-Based Contagion Mapping',
-      desc: 'Treating customers as interconnected nodes sharing IPs, devices, and employers to map hidden financial contagion and fraud rings.',
+      title: activeMode === 'b' || activeMode === 'c' ? 'Multi-View Relational Network' : 'Tabular Processing Pipeline',
+      subtitle: activeData.methodology.steps[1],
+      desc: activeMode === 'b' || activeMode === 'c' ? 'Treating customers as interconnected nodes sharing IPs, devices, and employers to map hidden financial contagion and fraud rings.' : 'Sequential preprocessing pipeline mapping raw attributes to standard scales before boosting.',
       highlights: [
-        { label: 'Total Edges', value: '1,673' },
-        { label: 'Clusters Found', value: '63' },
-        { label: 'Contagion Rate', value: '45.3%' },
+        { label: 'Step 2', value: activeData.methodology.steps[1].split(' ')[0] },
+        { label: 'Step 3', value: activeData.methodology.steps[2].split(' ')[0] },
       ],
       chart: (
         <div className="flex flex-col gap-3 w-full h-full justify-center px-2">
@@ -87,12 +81,12 @@ const MethodologySection = () => {
       num: '003',
       icon: <ShieldCheck className="w-7 h-7" />,
       title: 'Explainable Scorecard Model',
-      subtitle: 'L2-Regularized Logistic Regression',
+      subtitle: activeData.methodology.steps[activeData.methodology.steps.length - 1],
       desc: 'Ensuring 100% regulatory compliance. Every credit decision comes with exact point-deduction explanations, satisfying FCRA adverse action requirements.',
       highlights: [
-        { label: 'Model Type', value: 'L2-LR' },
-        { label: 'Top Predictor', value: '+0.607' },
-        { label: 'Explainability', value: '100%' },
+        { label: 'Model Type', value: 'XGBoost' },
+        { label: 'Top Predictor', value: activeData.featureWeights[0].name },
+        { label: 'Explainability', value: 'SHAP' },
       ],
       chart: (
         <ResponsiveContainer width="100%" height="100%">

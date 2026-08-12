@@ -23,6 +23,19 @@ function App() {
   });
   const [isConnected, setIsConnected] = useState(false);
 
+  const [activeMode, setActiveMode] = useState("a");
+  const [apiData, setApiData] = useState({});
+
+  // Fetch real engine metrics from API when mode changes
+  useEffect(() => {
+    fetch(`http://localhost:8000/api/engine/${activeMode}/metrics`)
+      .then(r => r.json())
+      .then(data => {
+        setApiData(prev => ({ ...prev, [activeMode]: data }));
+      })
+      .catch(() => {});
+  }, [activeMode]);
+
   // Fetch initial graph for background
   useEffect(() => {
     fetch('http://localhost:8000/api/graph')
@@ -90,9 +103,9 @@ function App() {
       >
         <Navbar isConnected={isConnected} />
         <HeroSection />
-        <DashboardCard liveData={liveData} onGraphUpdate={handleGraphUpdate} />
-        <MethodologySection />
-        <InsightsSection />
+        <DashboardCard liveData={liveData} onGraphUpdate={handleGraphUpdate} activeMode={activeMode} setActiveMode={setActiveMode} apiData={apiData} />
+        <MethodologySection activeMode={activeMode} apiData={apiData} />
+        <InsightsSection activeMode={activeMode} apiData={apiData} />
         <Footer />
       </div>
     </div>

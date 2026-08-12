@@ -23,7 +23,7 @@ const Footer = () => (
           <a href="#" className="hover:text-[#0F2350] transition-colors flex items-center gap-2 text-sm">
             <Code size={15} /> API
           </a>
-          <a href="#" className="hover:text-[#0F2350] transition-colors flex items-center gap-2 text-sm">
+          <a href="https://github.com/Allen-Ajith8/Unified-Credits" target="_blank" rel="noopener noreferrer" className="hover:text-[#0F2350] transition-colors flex items-center gap-2 text-sm">
             <GitBranch size={15} /> GitHub
           </a>
         </div>
