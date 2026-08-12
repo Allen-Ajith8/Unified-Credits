@@ -28,7 +28,7 @@ const NetworkBackground = ({ graphData }) => {
     if (!fgRef.current) return;
     const renderer = fgRef.current.renderer();
     if (renderer) {
-      renderer.setClearColor(0x050a18, 1); // Very dark blue-black
+      renderer.setClearColor(0xF4F5F7, 1); // Cream/slate pearl background
     }
     const controls = fgRef.current.controls();
     if (controls) {
@@ -36,67 +36,47 @@ const NetworkBackground = ({ graphData }) => {
     }
   }, []);
 
-  // Glow texture for star-like nodes
-  const starTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    // Outer soft glow
-    const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    gradient.addColorStop(0.15, 'rgba(255, 255, 255, 0.9)');
-    gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.5)');
-    gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 128, 128);
-    
-    return new THREE.CanvasTexture(canvas);
-  }, []);
+  const sphereGeometry = useMemo(() => new THREE.SphereGeometry(1, 12, 12), []);
 
   const nodeThreeObject = React.useCallback((node) => {
     const isDefault = node.is_default === 1;
     const score = node.credit_score || 500;
-    const prob = node.prob || 0.5;
     
-    // Color based on risk profile using our palette
-    let color;
+    // Color based on risk profile using the deep vibrant palette
+    let colorHex;
     if (isDefault) {
-      color = new THREE.Color(0x4A2C76); // Amethyst — defaulters
+      colorHex = 0x4A2C76; // Digital Amethyst — defaulters
     } else if (score > 750) {
-      color = new THREE.Color(0xD4AF37); // Gold — premium borrowers
+      colorHex = 0x006A67; // Dynamic Teal
     } else if (score > 600) {
-      color = new THREE.Color(0x006A67); // Teal — healthy cash flow
+      colorHex = 0xD4AF37; // Brushed Gold
     } else {
-      color = new THREE.Color(0x0F2350).lerp(new THREE.Color(0x3366CC), 0.4); // Lighter sapphire — visible
+      colorHex = 0x0F2350; // Deep Sapphire
     }
 
-    // Size: defaulters slightly bigger for visibility, base size larger overall
-    const baseSize = isDefault ? 5 : 3;
+    const material = new THREE.MeshBasicMaterial({
+      color: colorHex,
+      transparent: true,
+      opacity: isDefault ? 1.0 : 0.85,
+    });
+    
+    const mesh = new THREE.Mesh(sphereGeometry, material);
+    
+    // Solid base size. Defaulters slightly larger
+    const baseSize = isDefault ? 4.5 : 2.5;
     const sizeMultiplier = node.size || 1.5;
     const finalSize = baseSize * sizeMultiplier;
-
-    const spriteMaterial = new THREE.SpriteMaterial({
-      map: starTexture,
-      color: color,
-      transparent: true,
-      opacity: isDefault ? 0.95 : 0.75,
-      blending: THREE.AdditiveBlending, // Glow effect
-      depthWrite: false,
-    });
-    const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(finalSize, finalSize, 1);
-    return sprite;
-  }, [starTexture]);
+    
+    mesh.scale.set(finalSize, finalSize, finalSize);
+    return mesh;
+  }, [sphereGeometry]);
 
   // Generate default scattered nodes if no data from API yet
   const displayData = useMemo(() => {
     if (graphData && graphData.nodes && graphData.nodes.length > 0) {
       return graphData;
     }
-    // Generate 3340 placeholder stars while waiting for API
+    // Generate 3340 placeholder nodes while waiting for API
     const nodes = [];
     for (let i = 0; i < 3340; i++) {
       nodes.push({
@@ -110,16 +90,16 @@ const NetworkBackground = ({ graphData }) => {
   }, [graphData]);
 
   return (
-    <div className="fixed inset-0 z-0" style={{ background: '#050a18' }}>
+    <div className="fixed inset-0 z-0" style={{ background: '#F4F5F7' }}>
       <ForceGraph3D
         ref={fgRef}
         graphData={displayData}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
-        linkColor={() => 'rgba(100, 140, 255, 0.06)'}
-        linkWidth={0.3}
-        linkOpacity={0.06}
-        backgroundColor="#050a18"
+        linkColor={() => 'rgba(15, 35, 80, 0.15)'}
+        linkWidth={0.5}
+        linkOpacity={0.2}
+        backgroundColor="#F4F5F7"
         showNavInfo={false}
         enableNodeDrag={false}
         enableNavigationControls={false}

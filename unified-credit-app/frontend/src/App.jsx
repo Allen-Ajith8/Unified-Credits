@@ -25,6 +25,7 @@ function App() {
 
   const [activeMode, setActiveMode] = useState("a");
   const [apiData, setApiData] = useState({});
+  const [show3DView, setShow3DView] = useState(false);
 
   // Fetch real engine metrics from API when mode changes
   useEffect(() => {
@@ -88,26 +89,40 @@ function App() {
   return (
     <div className="relative min-h-screen">
       {/* 3D Background — always renders, loads in background */}
-      <NetworkBackground graphData={graphData} />
+      <NetworkBackground graphData={graphData} isInteractive={show3DView} />
 
       {/* Loading Screen — hides when content should show */}
-      {!showContent && (
+      {!showContent && !show3DView && (
         <LoadingScreen ready={bgReady} onSkip={handleSkip} />
       )}
 
       {/* Main Content — fades in */}
-      <div
-        className={`relative z-10 transition-opacity duration-1000 ${
-          showContent ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        <Navbar isConnected={isConnected} />
-        <HeroSection />
-        <DashboardCard liveData={liveData} onGraphUpdate={handleGraphUpdate} activeMode={activeMode} setActiveMode={setActiveMode} apiData={apiData} />
-        <MethodologySection activeMode={activeMode} apiData={apiData} />
-        <InsightsSection activeMode={activeMode} apiData={apiData} />
-        <Footer />
-      </div>
+      {show3DView ? (
+        <div className={`relative z-50 transition-opacity duration-1000 ${showContent ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="absolute top-6 left-6">
+            <button
+              onClick={() => setShow3DView(false)}
+              className="px-6 py-2.5 bg-white/10 backdrop-blur-xl border border-white/20 text-white rounded-full hover:bg-white/20 transition-all font-semibold shadow-[0_0_20px_rgba(0,106,103,0.3)] flex items-center gap-2"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              Exit Hologram
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`relative z-10 transition-opacity duration-1000 ${
+            showContent ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
+          <Navbar isConnected={isConnected} onOpen3D={() => setShow3DView(true)} />
+          <HeroSection />
+          <DashboardCard liveData={liveData} onGraphUpdate={handleGraphUpdate} activeMode={activeMode} setActiveMode={setActiveMode} apiData={apiData} />
+          <MethodologySection activeMode={activeMode} apiData={apiData} />
+          <InsightsSection activeMode={activeMode} apiData={apiData} />
+          <Footer />
+        </div>
+      )}
     </div>
   );
 }

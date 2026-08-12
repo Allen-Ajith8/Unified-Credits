@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-const Navbar = ({ isConnected }) => {
+const Navbar = ({ isConnected, onOpen3D }) => {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -24,9 +24,9 @@ const Navbar = ({ isConnected }) => {
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#0F2350] flex items-center justify-center">
-            <span className="text-[#0F2350] text-xs font-bold">UCE</span>
+            <span className="text-white text-xs font-bold">UCE</span>
           </div>
-          <span className={`text-lg font-semibold tracking-tight ${scrolled ? 'text-[#0F2350]' : 'text-[#0F2350]'}`}>
+          <span className={`text-lg font-semibold tracking-tight text-[#0F2350]`}>
             Unified Credit Engine
           </span>
         </div>
@@ -34,18 +34,29 @@ const Navbar = ({ isConnected }) => {
           <div className="hidden md:flex gap-6">
             {['Overview', 'Methodology', 'Insights'].map(item => (
               <a key={item} href={`#${item.toLowerCase()}`}
-                className={`text-sm font-medium transition-colors ${
-                  scrolled ? 'text-[#6E6E73] hover:text-[#0F2350]' : 'text-[#0F2350]/70 hover:text-[#0F2350]'
-                }`}>
+                className={`text-sm font-medium transition-colors text-[#0F2350]/70 hover:text-[#0F2350]`}>
                 {item}
               </a>
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#006A67] animate-pulse' : 'bg-[#4A2C76]'}`} />
-            <span className={`text-xs ${scrolled ? 'text-[#86868B]' : 'text-[#0F2350]/50'}`}>
-              {isConnected ? 'Live' : 'Offline'}
-            </span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[#30D158] animate-pulse' : 'bg-[#FF453A]'}`} />
+              <span className={`text-xs text-[#0F2350]/50`}>
+                {isConnected ? 'Live' : 'Offline'}
+              </span>
+            </div>
+            <button
+              onClick={onOpen3D}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 ${
+                scrolled 
+                  ? 'bg-[#0F2350] text-white hover:bg-[#006A67] shadow-md' 
+                  : 'bg-[#0F2350]/10 text-[#0F2350] hover:bg-[#0F2350]/20 border border-[#0F2350]/20'
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+              3D View
+            </button>
           </div>
         </div>
       </div>

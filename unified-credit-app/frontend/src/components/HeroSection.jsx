@@ -23,28 +23,28 @@ const HeroSection = () => (
       className="text-center max-w-4xl mx-auto"
     >
       <motion.div variants={item} className="mb-6">
-        <span className="inline-block px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/15 text-[#0F2350]/80 text-xs font-medium tracking-widest uppercase">
+        <span className="inline-block px-4 py-1.5 rounded-full bg-[#0F2350]/5 border border-[#0F2350]/10 text-[#0F2350]/70 text-xs font-semibold tracking-widest uppercase">
           Data Science Project
         </span>
       </motion.div>
       <motion.h1 variants={item}
-        className="text-5xl md:text-7xl lg:text-8xl font-semibold text-[#0F2350] tracking-tight leading-[1.05] mb-6"
+        className="text-5xl md:text-7xl lg:text-8xl font-bold text-[#0F2350] tracking-tight leading-[1.05] mb-6"
       >
         The Unified<br />Credit Engine
       </motion.h1>
       <motion.p variants={item}
-        className="text-lg md:text-xl text-[#0F2350]/50 max-w-2xl mx-auto mb-10 leading-relaxed"
+        className="text-lg md:text-xl text-[#0F2350]/60 max-w-2xl mx-auto mb-10 leading-relaxed font-medium"
       >
         Integrating Cash Flow Analytics & Network Contagion Mapping for Holistic Risk Assessment
       </motion.p>
       <motion.div variants={item} className="flex flex-wrap gap-4 justify-center">
         <a href="#dashboard"
-          className="px-8 py-3.5 rounded-full bg-white text-[#0F2350] text-sm font-semibold hover:bg-white/90 transition-all hover:scale-105"
+          className="px-8 py-3.5 rounded-full bg-[#0F2350] text-white text-sm font-semibold hover:bg-[#006A67] transition-all hover:scale-105 shadow-lg shadow-[#0F2350]/20"
         >
           View Live Dashboard ↓
         </a>
         <a href="#methodology"
-          className="px-8 py-3.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-[#0F2350] text-sm font-semibold hover:bg-white/20 transition-all"
+          className="px-8 py-3.5 rounded-full bg-white/50 backdrop-blur-xl border border-[#0F2350]/10 text-[#0F2350] text-sm font-semibold hover:bg-white/80 transition-all shadow-sm"
         >
           Explore Methodology
         </a>
