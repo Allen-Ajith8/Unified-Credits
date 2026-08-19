@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-const Navbar = ({ isConnected, onOpen3D }) => {
+const Navbar = ({ isConnected, onOpen3D, onOpenChat }) => {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -23,9 +23,7 @@ const Navbar = ({ isConnected, onOpen3D }) => {
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#0F2350] flex items-center justify-center">
-            <span className="text-white text-xs font-bold">UCE</span>
-          </div>
+          <img src="/uce-logo.svg" alt="UCE Logo" className="w-8 h-8 rounded-lg shadow-sm" />
           <span className={`text-lg font-semibold tracking-tight text-[#0F2350]`}>
             Unified Credit Engine
           </span>
@@ -46,6 +44,17 @@ const Navbar = ({ isConnected, onOpen3D }) => {
                 {isConnected ? 'Live' : 'Offline'}
               </span>
             </div>
+            <button
+              onClick={onOpenChat}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 ${
+                scrolled 
+                  ? 'bg-[#006A67] text-white hover:bg-[#005550] shadow-md' 
+                  : 'bg-[#006A67]/10 text-[#006A67] hover:bg-[#006A67]/20 border border-[#006A67]/20'
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              AI Copilot
+            </button>
             <button
               onClick={onOpen3D}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 ${

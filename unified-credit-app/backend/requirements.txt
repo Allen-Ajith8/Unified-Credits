@@ -10,3 +10,4 @@ torch>=2.0.0
 torch-geometric>=2.4.0
 python-multipart>=0.0.6
 websockets>=12.0
+cognee[ollama]

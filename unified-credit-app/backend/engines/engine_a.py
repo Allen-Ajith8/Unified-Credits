@@ -19,17 +19,13 @@ import shap
 import warnings
 warnings.filterwarnings("ignore")
 
-# The 28 standard tabular features
+# The standard tabular features
 TABULAR_FEATURES = [
-    'age', 'num_dependents', 'annual_income', 'monthly_income',
-    'monthly_expenses', 'monthly_debt_payments', 'debt_to_income_ratio',
-    'total_existing_debt', 'savings_balance', 'num_bank_accounts',
-    'num_open_loans', 'num_credit_cards', 'credit_utilization_pct',
-    'credit_score', 'credit_history_months', 'num_past_defaults',
-    'num_late_payments_30d', 'num_late_payments_60d', 'num_late_payments_90d',
-    'num_credit_inquiries_6m', 'loan_amount', 'loan_term_months',
-    'interest_rate', 'avg_monthly_transactions', 'avg_transaction_amount',
-    'salary_deposit_regularity', 'emi_bounce_count', 'account_age_months'
+    'Age', 'CIBIL_Score', 'Verified_Monthly_Income', 'Debt_to_Income_Ratio',
+    'Utility_Payment_Consistency', 'Loan_Amount', 'Loan_Term_Months',
+    'Interest_Rate', 'Num_Past_Defaults', 'Num_Active_Loans',
+    'Credit_History_Months', 'Savings_Balance', 'EMI_Bounce_Count',
+    'Credit_Utilization_Pct', 'Salary_Deposit_Regularity'
 ]
 
 
@@ -47,7 +43,7 @@ def run(df: pd.DataFrame) -> dict:
     
     # Prepare features and target
     X = df[TABULAR_FEATURES].fillna(0).copy()
-    y = df['default'].values
+    y = df['Target_Default'].values
     
     # Scale features
     scaler = StandardScaler()

@@ -65,7 +65,7 @@ export const engineMetrics = {
     ],
     methodology: {
       title: "Hybrid Graph Neural Network Engine",
-      description: "Multi-view graph construction from shared devices, IPs, and employers. 2-layer GAT produces 32-dim trust embeddings per borrower. Combined with tabular features for XGBoost decision engine. SHAP explainability on all features.",
+      description: "Multi-view graph construction from shared devices, IPs, employers, and zip codes. 2-layer GAT produces 32-dim trust embeddings per borrower. Combined with tabular features for XGBoost decision engine. SHAP explainability on all features.",
       steps: ["Multi-View Graph Construction", "2-Layer GAT (PyTorch Geometric)", "32-dim Node Embedding Extraction", "XGBoost on Tabular + Embeddings", "SHAP Explainability"],
     },
   },

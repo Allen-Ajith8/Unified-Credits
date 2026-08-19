@@ -59,9 +59,11 @@ const MethodologySection = ({ activeMode }) => {
       chart: (
         <div className="flex flex-col gap-3 w-full h-full justify-center px-2">
           {[
-            { view: 'Digital View', edges: 458, desc: 'Shared device_id → Fraud Rings', pct: 27 },
-            { view: 'Geospatial View', edges: 162, desc: 'Shared ip_address → Household Risk', pct: 10 },
-            { view: 'Socio-Economic', edges: 1053, desc: 'Shared employer_id → Layoff Contagion', pct: 63 },
+            { view: 'Digital View', edges: 458, desc: 'Shared device_id → Fraud Rings', pct: 22 },
+            { view: 'Geospatial View', edges: 162, desc: 'Shared ip_address → Household Risk', pct: 8 },
+            { view: 'Socio-Economic', edges: 1053, desc: 'Shared employer_id → Layoff Contagion', pct: 50 },
+            { view: 'Geographic Risk', edges: 159, desc: 'Shared zip_code → Regional Collapse', pct: 8 },
+            { view: 'Corporate Contagion', edges: 419, desc: 'Shared employer_name → Mass Layoffs', pct: 12 },
           ].map((v, i) => (
             <div key={i} className="bg-black/[0.03] border border-black/5 rounded-xl p-4">
               <div className="flex justify-between items-center mb-2">

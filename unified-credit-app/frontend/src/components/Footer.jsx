@@ -7,9 +7,7 @@ const Footer = () => (
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="text-center md:text-left">
           <div className="text-lg font-semibold text-[#0F2350] mb-1 flex items-center justify-center md:justify-start gap-2">
-            <div className="w-6 h-6 rounded-md bg-[#0F2350] flex items-center justify-center">
-              <span className="text-[#0F2350] text-[10px] font-bold">UCE</span>
-            </div>
+            <img src="/uce-logo.svg" alt="UCE Logo" className="w-6 h-6 rounded-md shadow-sm" />
             Unified Credit Engine
           </div>
           <p className="text-[#86868B] text-sm">

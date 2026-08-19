@@ -9,12 +9,13 @@ import numpy as np
 from engines import engine_a, engine_b
 
 
-def run(df) -> dict:
+def run(financial_df, fraud_df) -> dict:
     """
     Run both engines and compute comparative deltas.
     
     Args:
-        df: Full dataset DataFrame
+        financial_df: Financial features DataFrame
+        fraud_df: Fraud network DataFrame
         
     Returns:
         dict with results_a, results_b, and delta metrics
@@ -22,9 +23,9 @@ def run(df) -> dict:
     print("[Engine C] Starting Comparative Delta Analysis...")
     print("=" * 60)
     
-    # Run both engines
-    results_a = engine_a.run(df)
-    results_b = engine_b.run(df)
+    # Run both engines. Note that engine A uses only financial features.
+    results_a = engine_a.run(financial_df)
+    results_b = engine_b.run(financial_df, fraud_df)
     
     # Compute metric deltas
     metrics_a = results_a["metrics"]
@@ -42,7 +43,7 @@ def run(df) -> dict:
     preds_a = np.array(results_a["_full_preds"])
     preds_b = np.array(results_b["_full_preds"])
     
-    y_true = df['default'].values
+    y_true = financial_df['Target_Default'].values
     
     # Reclassification analysis
     changed = preds_a != preds_b

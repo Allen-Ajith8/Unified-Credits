@@ -30,11 +30,14 @@ import uvicorn
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from engines import engine_a, engine_b, engine_c
+from engines.engine_b import explain_router, set_engine_state
+from engines.copilot import ingest_credit_data, ask_copilot, get_copilot_status
 
 # ============================================================
 # Configuration
 # ============================================================
-DATASET_PATH = Path(__file__).parent.parent.parent / "Dataset" / "synthetic_credit_data_cleaned.csv"
+FINANCIAL_CSV = Path(__file__).parent.parent.parent / "Dataset" / "financial_underwriting_data.csv"
+FRAUD_CSV = Path(__file__).parent.parent.parent / "Dataset" / "fraud_network_edges.csv"
 
 # Global state
 engine_results = {
@@ -42,6 +45,8 @@ engine_results = {
     "b": None, 
     "c": None,
 }
+current_financial_df = None
+current_fraud_df = None
 current_df = None
 connected_clients = set()
 
@@ -49,7 +54,7 @@ connected_clients = set()
 # ============================================================
 # Startup: Load data and run all engines
 # ============================================================
-def run_all_engines(df: pd.DataFrame):
+def run_all_engines(financial_df: pd.DataFrame, fraud_df: pd.DataFrame):
     """Run all 3 engines on the given dataframe."""
     global engine_results
     
@@ -57,12 +62,16 @@ def run_all_engines(df: pd.DataFrame):
     print("RUNNING ALL 3 INFERENCE ENGINES")
     print("=" * 60 + "\n")
     
+    df = pd.merge(financial_df, fraud_df, on='Customer_ID', how='inner')
     # Engine C internally runs both A and B, so we get all 3 at once
-    result_c = engine_c.run(df)
+    result_c = engine_c.run(financial_df, fraud_df)
     
     engine_results["a"] = result_c["engineA"]
     engine_results["b"] = result_c["engineB"]
     engine_results["c"] = result_c
+    
+    # Provide engine results to the explain API
+    set_engine_state(engine_results, df)
     
     print("=" * 60)
     print("ALL ENGINES COMPLETE")
@@ -75,18 +84,21 @@ def run_all_engines(df: pd.DataFrame):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load dataset and run engines on startup."""
-    global current_df
+    global current_financial_df, current_fraud_df, current_df
     
-    print(f"\nLoading dataset from: {DATASET_PATH}")
-    if DATASET_PATH.exists():
-        current_df = pd.read_csv(str(DATASET_PATH))
-        print(f"Loaded {len(current_df)} rows, {len(current_df.columns)} columns")
-        run_all_engines(current_df)
+    print(f"\nLoading datasets from: {FINANCIAL_CSV.parent}")
+    if FINANCIAL_CSV.exists() and FRAUD_CSV.exists():
+        current_financial_df = pd.read_csv(str(FINANCIAL_CSV))
+        current_fraud_df = pd.read_csv(str(FRAUD_CSV))
+        current_df = pd.merge(current_financial_df, current_fraud_df, on='Customer_ID', how='inner')
+        print(f"Loaded {len(current_df)} rows")
+        run_all_engines(current_financial_df, current_fraud_df)
     else:
-        print(f"WARNING: Dataset not found at {DATASET_PATH}")
+        print(f"WARNING: Datasets not found")
         print("Upload a CSV via POST /api/upload to get started")
     
     yield
+
     print("Shutting down...")
 
 
@@ -107,6 +119,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(explain_router)
 
 
 # ============================================================
@@ -207,101 +221,131 @@ async def get_graph_data(mode: str = "b"):
     nodes = []
     links = []
     
+    positions = result_b.get("_node_positions", {}) if result_b else {}
+    
+    def get_node_dict(i, prob=0.5, delta=None, size_multiplier=1.0):
+        row = current_df.iloc[i]
+        pos = positions.get(i, {'x': random.uniform(-500, 500), 'y': random.uniform(-500, 500), 'z': random.uniform(-500, 500)})
+        node_data = {
+            "id": i,
+            "name": str(row.get("Customer_ID", f"Borrower {i}")),
+            "credit_score": int(row.get("CIBIL_Score", 500)),
+            "is_default": int(row.get("Target_Default", 0)),
+            "prob": float(prob),
+            "size": (2.0 if int(row.get("Target_Default", 0)) == 1 else 1.5) * size_multiplier,
+            "x": pos['x'],
+            "y": pos['y'],
+            "z": pos['z'],
+        }
+        if delta is not None:
+            node_data["delta"] = delta
+            node_data["size"] = 1.5 + abs(delta) * 5
+        return node_data
+    
     if mode == "a" and result_a:
-        # Tabular: just nodes scattered randomly, colored by credit score
         probs = result_a.get("_full_probs", [])
         for i in range(len(current_df)):
-            nodes.append({
-                "id": i,
-                "credit_score": int(current_df.iloc[i].get("credit_score", 500)),
-                "is_default": int(current_df.iloc[i].get("default", 0)),
-                "prob": float(probs[i]) if i < len(probs) else 0.5,
-                "size": 1.5,
-            })
-    
+            nodes.append(get_node_dict(i, prob=probs[i] if i < len(probs) else 0.5))
+            
     elif mode == "b" and result_b:
-        # GNN: full graph with edges
         probs = result_b.get("_full_probs", [])
         G = result_b.get("_graph")
         
         for i in range(len(current_df)):
-            nodes.append({
-                "id": i,
-                "credit_score": int(current_df.iloc[i].get("credit_score", 500)),
-                "is_default": int(current_df.iloc[i].get("default", 0)),
-                "prob": float(probs[i]) if i < len(probs) else 0.5,
-                "size": 2.0 if current_df.iloc[i].get("default", 0) == 1 else 1.5,
-            })
-        
-        if G is not None:
-            # Sample edges for visualization (limit to 2000 for performance)
-            all_edges = list(G.edges(data=True))
-            sample_size = min(2000, len(all_edges))
-            sampled = random.sample(all_edges, sample_size) if len(all_edges) > sample_size else all_edges
+            nodes.append(get_node_dict(i, prob=probs[i] if i < len(probs) else 0.5))
             
-            for u, v, data in sampled:
+        if G is not None:
+            # Return ALL edges without capping
+            for u, v, data in G.edges(data=True):
                 links.append({
                     "source": u,
                     "target": v,
                     "type": data.get("type", "unknown"),
                 })
-    
+                
     elif mode == "c" and result_a and result_b:
-        # Comparative: color by delta
         probs_a = result_a.get("_full_probs", [])
         probs_b = result_b.get("_full_probs", [])
         
         for i in range(len(current_df)):
             pa = float(probs_a[i]) if i < len(probs_a) else 0.5
             pb = float(probs_b[i]) if i < len(probs_b) else 0.5
-            delta = pb - pa
+            delta = round(pb - pa, 4)
+            nodes.append(get_node_dict(i, prob=pb, delta=delta))
             
-            nodes.append({
-                "id": i,
-                "credit_score": int(current_df.iloc[i].get("credit_score", 500)),
-                "is_default": int(current_df.iloc[i].get("default", 0)),
-                "prob": pb,
-                "delta": round(delta, 4),
-                "size": 1.5 + abs(delta) * 5,  # Bigger nodes = bigger change
-            })
-    
     return {"nodes": nodes, "links": links}
 
 
+@app.post("/api/chat")
+async def chat(payload: dict):
+    """
+    AI Copilot: Ask a natural language question about the credit graph.
+    Body: { "query": "Why is borrower 120 risky?", "node_id": 120 (optional) }
+    """
+    query = payload.get("query", "")
+    node_id = payload.get("node_id", None)
+
+    if not query.strip():
+        return {"answer": "Please ask a question.", "status": "error"}
+
+    result = await ask_copilot(
+        query=query,
+        node_id=node_id,
+        df=current_df,
+    )
+    return result
+
+
+@app.get("/api/copilot/status")
+async def copilot_status():
+    """Check the current status of the Cognee AI Copilot."""
+    return get_copilot_status()
+
 @app.post("/api/upload")
-async def upload_dataset(file: UploadFile = File(...)):
+async def upload_dataset(
+    financial_file: Optional[UploadFile] = File(None),
+    fraud_file: Optional[UploadFile] = File(None),
+    merged_file: Optional[UploadFile] = File(None)
+):
     """
-    Upload a new CSV dataset. Re-runs all 3 engines without server restart.
+    Upload new CSV dataset(s). Re-runs all 3 engines without server restart.
+    Accepts either (financial_file AND fraud_file) OR merged_file.
     """
-    global current_df
-    
-    if not file.filename.endswith('.csv'):
-        return JSONResponse(status_code=400, content={"error": "Only CSV files are supported."})
+    global current_financial_df, current_fraud_df, current_df
     
     try:
-        contents = await file.read()
-        new_df = pd.read_csv(pd.io.common.BytesIO(contents))
-        
-        print(f"\nUploaded: {file.filename} ({len(new_df)} rows, {len(new_df.columns)} columns)")
+        if merged_file is not None:
+            contents = await merged_file.read()
+            new_df = pd.read_csv(pd.io.common.BytesIO(contents))
+            # Assume it has all required columns. We split it back conceptually or just use it.
+            # But run_all_engines takes financial_df and fraud_df. 
+            # If we upload a merged one, we can pass it as both and merge will be a no-op / just columns overlap.
+            current_financial_df = new_df
+            current_fraud_df = new_df
+            current_df = new_df
+            
+        elif financial_file is not None and fraud_file is not None:
+            fin_contents = await financial_file.read()
+            fraud_contents = await fraud_file.read()
+            current_financial_df = pd.read_csv(pd.io.common.BytesIO(fin_contents))
+            current_fraud_df = pd.read_csv(pd.io.common.BytesIO(fraud_contents))
+            current_df = pd.merge(current_financial_df, current_fraud_df, on='Customer_ID', how='inner')
+        else:
+            return JSONResponse(status_code=400, content={"error": "Provide either both financial_file and fraud_file, or a merged_file."})
+            
+        print(f"\nUploaded new data ({len(current_df)} rows)")
         
         # Validate required columns
-        required = ['default'] + engine_a.TABULAR_FEATURES[:5]  # Check a few
-        missing = [c for c in required if c not in new_df.columns]
+        required = ['Target_Default'] + engine_a.TABULAR_FEATURES[:5]
+        missing = [c for c in required if c not in current_df.columns]
         if missing:
             return JSONResponse(status_code=400, content={
                 "error": f"Missing required columns: {missing}",
                 "required": required,
             })
-        
-        # Append to existing data or replace
-        if current_df is not None:
-            current_df = pd.concat([current_df, new_df], ignore_index=True)
-            print(f"Appended. Total rows: {len(current_df)}")
-        else:
-            current_df = new_df
-        
+            
         # Re-run all engines
-        run_all_engines(current_df)
+        run_all_engines(current_financial_df, current_fraud_df)
         
         # Notify WebSocket clients
         for ws in connected_clients.copy():

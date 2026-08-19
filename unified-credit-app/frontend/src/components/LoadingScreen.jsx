@@ -74,8 +74,8 @@ const LoadingScreen = ({ ready, onSkip }) => {
       >
         {/* Logo Mark */}
         <div className="mb-8 flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-xl flex items-center justify-center">
-            <span className="text-2xl font-bold text-[#0F2350] tracking-tighter">UCE</span>
+          <div className="w-20 h-20 rounded-2xl bg-white/40 border border-[#0F2350]/15 backdrop-blur-xl flex items-center justify-center p-2 shadow-xl">
+            <img src="/uce-logo.svg" alt="UCE Logo" className="w-full h-full object-contain rounded-xl" />
           </div>
         </div>
 
