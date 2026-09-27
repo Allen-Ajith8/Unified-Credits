@@ -49,6 +49,8 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
+  const displayDataRef = useRef({ nodes: [], links: [] });
+
   // ============================================================
   // 1. Build display data FIRST (Big Bang animation)
   //    Must be defined before any effect that references it.
@@ -149,62 +151,10 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
     }
 
     setDataSource(isLive ? 'live' : 'simulated');
-    return { nodes, links };
+    const data = { nodes, links, isLive };
+    displayDataRef.current = data;
+    return data;
   }, [graphData]);
-
-  // ============================================================
-  // 2. Sync instanced meshes every frame (the 120fps engine)
-  // ============================================================
-  const syncInstancedMeshes = useCallback(() => {
-    const nodes = displayData.nodes;
-    const links = displayData.links;
-    if (!nodes) return;
-
-    // GUARANTEED SPIN: Rotate the entire 3D world independently of the camera
-    if (fgRef.current) {
-      const scene = fgRef.current.scene();
-      if (scene) {
-        scene.rotation.y += 0.0015; // Smooth, continuous spin
-      }
-    }
-
-    // Update node InstancedMesh positions
-    const instanced = instancedRef.current;
-    if (instanced && nodes.length > 0) {
-      for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
-        const isDefault = node.is_default === 1;
-        const isConnected = node._connected;
-        const size = isConnected ? (isDefault ? 1.2 : 0.7) : 0.65;
-
-        _dummy.position.set(node.fx ?? node.x ?? 0, node.fy ?? node.y ?? 0, node.fz ?? node.z ?? 0);
-        _dummy.scale.set(size, size, size);
-        _dummy.updateMatrix();
-        instanced.setMatrixAt(i, _dummy.matrix);
-      }
-      instanced.instanceMatrix.needsUpdate = true;
-    }
-
-    // Update edge LineSegments positions
-    const lineSeg = edgeMeshRef.current;
-    if (lineSeg && links && links.length > 0) {
-      const posArr = lineSeg.geometry.attributes.position.array;
-      for (let i = 0; i < links.length; i++) {
-        const link = links[i];
-        const src = typeof link.source === 'object' ? link.source : nodes.find(n => n.id === link.source);
-        const tgt = typeof link.target === 'object' ? link.target : nodes.find(n => n.id === link.target);
-        if (src && tgt) {
-          posArr[i * 6 + 0] = src.fx ?? src.x ?? 0;
-          posArr[i * 6 + 1] = src.fy ?? src.y ?? 0;
-          posArr[i * 6 + 2] = src.fz ?? src.z ?? 0;
-          posArr[i * 6 + 3] = tgt.fx ?? tgt.x ?? 0;
-          posArr[i * 6 + 4] = tgt.fy ?? tgt.y ?? 0;
-          posArr[i * 6 + 5] = tgt.fz ?? tgt.z ?? 0;
-        }
-      }
-      lineSeg.geometry.attributes.position.needsUpdate = true;
-    }
-  }, [displayData]);
 
   // ============================================================
   // 4. Effects (all hooks below — no early returns between hooks)
@@ -226,6 +176,64 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
       rafId = requestAnimationFrame(measure);
     };
     rafId = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
+
+  // Bulletproof continuous rotation and render loop
+  useEffect(() => {
+    let rafId;
+    const renderLoop = () => {
+      const fg = fgRef.current;
+      if (fg) {
+        const scene = fg.scene();
+        const camera = fg.camera();
+        const renderer = fg.renderer();
+        
+        if (scene && camera && renderer) {
+          // 1. Rotate the scene endlessly
+          scene.rotation.y += 0.0015;
+          
+          // 2. Sync matrices during the Big Bang animation or when physics are paused
+          const nodes = displayDataRef.current.nodes;
+          const links = displayDataRef.current.links;
+          const instanced = instancedRef.current;
+          const lineSeg = edgeMeshRef.current;
+          
+          if (instanced && nodes && nodes.length > 0) {
+            for (let i = 0; i < nodes.length; i++) {
+              const node = nodes[i];
+              const isDefault = node.is_default === 1;
+              const isConnected = node._connected;
+              const size = isConnected ? (isDefault ? 1.2 : 0.7) : 0.65;
+              _dummy.position.set(node.fx ?? node.x ?? 0, node.fy ?? node.y ?? 0, node.fz ?? node.z ?? 0);
+              _dummy.scale.set(size, size, size);
+              _dummy.updateMatrix();
+              instanced.setMatrixAt(i, _dummy.matrix);
+            }
+            instanced.instanceMatrix.needsUpdate = true;
+          }
+
+          if (lineSeg && links && links.length > 0) {
+            const posArr = lineSeg.geometry.attributes.position.array;
+            for (let i = 0; i < links.length; i++) {
+              const link = links[i];
+              const src = typeof link.source === 'object' ? link.source : nodes.find(n => n.id === link.source);
+              const tgt = typeof link.target === 'object' ? link.target : nodes.find(n => n.id === link.target);
+              if (src && tgt) {
+                posArr[i*6+0] = src.fx ?? src.x ?? 0; posArr[i*6+1] = src.fy ?? src.y ?? 0; posArr[i*6+2] = src.fz ?? src.z ?? 0;
+                posArr[i*6+3] = tgt.fx ?? tgt.x ?? 0; posArr[i*6+4] = tgt.fy ?? tgt.y ?? 0; posArr[i*6+5] = tgt.fz ?? tgt.z ?? 0;
+              }
+            }
+            lineSeg.geometry.attributes.position.needsUpdate = true;
+          }
+
+          // 3. Force the renderer to paint our rotation/animation!
+          renderer.render(scene, camera);
+        }
+      }
+      rafId = requestAnimationFrame(renderLoop);
+    };
+    renderLoop();
     return () => cancelAnimationFrame(rafId);
   }, []);
 
@@ -424,7 +432,6 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
         graphData={displayData}
         nodeVisibility={false}
         linkVisibility={false}
-        onEngineTick={syncInstancedMeshes}
         enableNavigationControls={!!isInteractive}
         enableNodeDrag={false}
         enablePointerInteraction={false}
