@@ -34,14 +34,21 @@ const HeroSection = () => (
       >
         Integrating Cash Flow Analytics & Network Contagion Mapping for Holistic Risk Assessment
       </motion.p>
-      <motion.div variants={item} className="flex flex-wrap gap-4 justify-center">
+      <motion.div variants={item} className="flex flex-wrap gap-5 justify-center mt-4">
+        {/* Apple-style Liquid Glass Primary Button */}
         <a href="#dashboard"
-          className="px-8 py-3.5 rounded-full bg-[#0F2350] dark:bg-white text-white dark:text-black text-sm font-semibold hover:bg-[#006A67] dark:hover:bg-gray-200 transition-all hover:scale-105 shadow-lg shadow-[#0F2350]/20"
+          className="relative group px-8 py-4 rounded-3xl bg-white/10 dark:bg-white/5 backdrop-blur-2xl backdrop-saturate-[180%] backdrop-brightness-110 border border-white/20 dark:border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),_0_8px_32px_rgba(0,0,0,0.1)] text-[#0F2350] dark:text-white text-sm font-semibold hover:bg-white/20 dark:hover:bg-white/10 transition-all hover:scale-[1.02] overflow-hidden"
         >
-          View Live Dashboard ↓
+          <span className="relative z-10 flex items-center gap-2">
+            View Live Dashboard 
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70 group-hover:translate-y-0.5 transition-transform"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+          </span>
+          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         </a>
+
+        {/* Apple-style Liquid Glass Secondary Button */}
         <a href="#methodology"
-          className="px-8 py-3.5 rounded-full bg-white/50 dark:bg-white/10 backdrop-blur-xl border border-[#0F2350]/10 dark:border-white/10 text-[#0F2350] dark:text-white text-sm font-semibold hover:bg-white/80 dark:hover:bg-white/20 transition-all shadow-sm"
+          className="relative px-8 py-4 rounded-3xl bg-black/5 dark:bg-black/20 backdrop-blur-2xl backdrop-saturate-[180%] border border-[#0F2350]/10 dark:border-white/5 shadow-[0_4px_24px_rgba(0,0,0,0.05)] text-[#0F2350]/80 dark:text-white/80 text-sm font-semibold hover:bg-black/10 dark:hover:bg-black/40 transition-all hover:scale-[1.02]"
         >
           Explore Methodology
         </a>
