@@ -267,13 +267,28 @@ async def get_graph_data(mode: str = "b"):
             nodes.append(get_node_dict(i, prob=probs[i] if i < len(probs) else 0.5))
             
         if G is not None:
-            # Return ALL edges without capping
+            # Cap visualization edges at 2000 for rendering performance.
+            # Prioritize fraud-signal edges (Device, IP, UPI), sample bulk.
+            # GNN training uses ALL edges — this only affects the frontend viz.
+            MAX_VIZ_EDGES = 2000
+            priority_edges = []
+            bulk_edges = []
+            
             for u, v, data in G.edges(data=True):
-                links.append({
-                    "source": u,
-                    "target": v,
-                    "type": data.get("type", "unknown"),
-                })
+                edge_type = data.get("type", "unknown")
+                edge = {"source": u, "target": v, "type": edge_type}
+                if edge_type in ("Shared Device", "Shared IP", "Shared UPI"):
+                    priority_edges.append(edge)
+                else:
+                    bulk_edges.append(edge)
+            
+            remaining = MAX_VIZ_EDGES - len(priority_edges)
+            if remaining > 0 and bulk_edges:
+                import random as _rand
+                sampled = _rand.sample(bulk_edges, min(remaining, len(bulk_edges)))
+                links = priority_edges + sampled
+            else:
+                links = priority_edges[:MAX_VIZ_EDGES]
                 
     elif mode == "c" and result_a and result_b:
         probs_a = result_a.get("_full_probs", [])
