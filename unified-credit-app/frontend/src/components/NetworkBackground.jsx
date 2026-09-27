@@ -11,11 +11,35 @@ const EDGE_COLORS = {
 };
 const DEFAULT_EDGE_COLOR = '#0F2350';
 
+// Shared geometry — allocated once in VRAM, reused by all 4000+ nodes
+const sharedSphereGeometry = new THREE.SphereGeometry(1, 8, 8);
+
 const NetworkBackground = ({ graphData, onNodeClick }) => {
   const fgRef = useRef();
   const [dataSource, setDataSource] = useState('simulated');
+  const [webglError, setWebglError] = useState(false);
+  const [activeGpu, setActiveGpu] = useState(null);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+
+  // Fallback UI when hardware acceleration is unavailable
+  if (webglError) {
+    return (
+      <div className="fixed inset-0 z-0 flex items-center justify-center" style={{ background: isDark ? '#000000' : '#F4F5F7' }}>
+        <div className="text-center p-8 border border-red-500/30 rounded-2xl bg-red-500/10 backdrop-blur-md max-w-md">
+          <div className="text-4xl mb-3">⚠️</div>
+          <h2 className="text-xl font-bold text-red-400 mb-2">Hardware Acceleration Required</h2>
+          <p className="text-sm text-gray-400 leading-relaxed">
+            Your browser is using a software renderer (SwiftShader/llvmpipe) instead of your GPU.
+            Please enable hardware acceleration in your browser settings to view the 3D graph.
+          </p>
+          <p className="text-xs text-gray-500 mt-3">
+            Chrome: Settings → System → "Use hardware acceleration when available"
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Auto-rotate
   useEffect(() => {
@@ -36,13 +60,38 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Renderer, controls, force tuning
+  // Renderer, controls, force tuning + GPU detection
   useEffect(() => {
     if (!fgRef.current) return;
     const renderer = fgRef.current.renderer();
-    if (renderer) {
-      renderer.setClearColor(isDark ? 0x000000 : 0xF4F5F7, 1);
+    if (!renderer) {
+      setWebglError(true);
+      return;
     }
+
+    renderer.setClearColor(isDark ? 0x000000 : 0xF4F5F7, 1);
+
+    // ---- GPU Detection ----
+    try {
+      const gl = renderer.getContext();
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      const gpuName = dbg
+        ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+        : gl.getParameter(gl.RENDERER);
+      console.log('Active renderer:', gpuName);
+      setActiveGpu(gpuName);
+
+      // Detect software rasterizer
+      const lower = gpuName.toLowerCase();
+      if (lower.includes('swiftshader') || lower.includes('llvmpipe') || lower.includes('software')) {
+        console.warn('⚠ Software rasterizer detected! GPU acceleration is not active.');
+        setWebglError(true);
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not detect GPU:', e);
+    }
+
     const controls = fgRef.current.controls();
     if (controls) {
       controls.enabled = false;
@@ -61,8 +110,23 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
     }
   }, [isDark]);
 
-  // Shared geometry for nodes — low-poly spheres for better performance with 40k nodes
-  const sphereGeometry = useMemo(() => new THREE.SphereGeometry(1, 6, 6), []);
+  // Material cache — only ~8 unique materials instead of 4000+
+  // This is the single biggest draw-call optimization: shared materials
+  // allow Three.js to batch geometry into fewer GPU calls.
+  const getMaterial = useMemo(() => {
+    const cache = {};
+    return (colorHex, opacity) => {
+      const key = `${colorHex}_${opacity}`;
+      if (!cache[key]) {
+        cache[key] = new THREE.MeshBasicMaterial({
+          color: colorHex,
+          transparent: true,
+          opacity,
+        });
+      }
+      return cache[key];
+    };
+  }, []);
 
   const nodeThreeObject = React.useCallback((node) => {
     const isDefault = node.is_default === 1;
@@ -80,20 +144,13 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
       colorHex = 0x0F2350;
     }
 
-    // Connected nodes: prominent. Isolated nodes: visible ambient particles.
     const opacity = isConnected
       ? (isDefault ? 0.9 : 0.8)
       : 0.7;
 
-    const material = new THREE.MeshBasicMaterial({
-      color: colorHex,
-      transparent: true,
-      opacity,
-    });
+    const material = getMaterial(colorHex, opacity);
+    const mesh = new THREE.Mesh(sharedSphereGeometry, material);
 
-    const mesh = new THREE.Mesh(sphereGeometry, material);
-
-    // Connected nodes are normal size, isolated ones slightly smaller
     const size = isConnected
       ? (isDefault ? 1.2 : 0.7)
       : 0.65;
@@ -101,7 +158,7 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
     mesh.scale.set(size, size, size);
     
     return mesh;
-  }, [sphereGeometry]);
+  }, [getMaterial]);
 
   // Edge color by type — returns CSS hex strings
   const linkColor = React.useCallback((link) => {
@@ -226,6 +283,12 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
     <div className="fixed inset-0 z-0 transition-colors duration-300" style={{ background: isDark ? '#000000' : '#F4F5F7' }}>
       <ForceGraph3D
         ref={fgRef}
+        rendererConfig={{
+          powerPreference: 'high-performance',
+          antialias: true,
+          alpha: false,
+          failIfMajorPerformanceCaveat: true,
+        }}
         graphData={displayData}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
@@ -322,12 +385,30 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
           style={{
             fontSize: '10px',
             fontWeight: 500,
-            color: 'rgba(15, 35, 80, 0.45)',
+            color: isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(15, 35, 80, 0.45)',
             letterSpacing: '0.02em',
           }}
         >
           {nodeCount.toLocaleString()} nodes{edgeCount > 0 ? ` · ${edgeCount.toLocaleString()} edges` : ''}
         </span>
+        {activeGpu && (
+          <span
+            style={{
+              fontSize: '9px',
+              fontWeight: 600,
+              color: '#A855F7',
+              borderLeft: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
+              paddingLeft: '8px',
+              letterSpacing: '0.02em',
+              maxWidth: '200px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🎮 {activeGpu}
+          </span>
+        )}
       </div>
 
       <style>{`
