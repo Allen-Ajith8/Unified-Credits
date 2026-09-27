@@ -1,12 +1,12 @@
-import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
-import ForceGraph3D from 'react-force-graph-3d';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, MeshTransmissionMaterial, Html, CameraControls } from '@react-three/drei';
+import { EffectComposer, Bloom, DepthOfField, ToneMapping } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { animate } from 'animejs';
 import { useTheme } from 'next-themes';
+import { forceSimulation, forceLink, forceManyBody, forceCenter } from 'd3-force-3d';
 
-// ============================================================
-// Constants
-// ============================================================
 const EDGE_COLORS_DARK = {
   'Shared Device': new THREE.Color('#2DD4BF'),
   'Shared IP':     new THREE.Color('#A855F7'),
@@ -27,40 +27,24 @@ const NODE_COLORS = {
   low:        new THREE.Color(0x0F2350),
 };
 
-// Shared geometry — allocated ONCE in VRAM
-const sharedSphereGeometry = new THREE.SphereGeometry(1, 8, 8);
-
-// Reusable math objects to avoid GC pressure in the render loop
 const _dummy = new THREE.Object3D();
-const _color = new THREE.Color();
 
 // ============================================================
-// Component
+// Graph Nodes & Edges (Instanced)
 // ============================================================
-const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
-  const fgRef = useRef();
-  const instancedRef = useRef(null);
-  const edgeMeshRef = useRef(null);
-  const rotateRef = useRef(null);
-  const [dataSource, setDataSource] = useState('simulated');
-  const [webglError, setWebglError] = useState(false);
-  const [activeGpu, setActiveGpu] = useState(null);
-  const [fps, setFps] = useState(0);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-
-  // ============================================================
-  // 1. Build display data FIRST (Big Bang animation)
-  //    Must be defined before any effect that references it.
-  // ============================================================
+const GraphGeometry = ({ graphData, isDark, onDataSourceChange }) => {
+  const instancedRef = useRef();
+  const linesRef = useRef();
+  
+  // 1. Build display data (Big Bang animation)
   const displayData = useMemo(() => {
     let nodes, links;
     let isLive = false;
 
     if (graphData && graphData.nodes && graphData.nodes.length > 0) {
       isLive = true;
-      nodes = [...graphData.nodes];
-      links = [...(graphData.links || [])];
+      nodes = graphData.nodes.map(n => ({ ...n }));
+      links = (graphData.links || []).map(l => ({ ...l }));
     } else {
       nodes = [];
       links = [];
@@ -98,13 +82,10 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
       }
     }
 
-    // Build connected node set
     const connectedIds = new Set();
     for (const link of links) {
-      const srcId = typeof link.source === 'object' ? link.source.id : link.source;
-      const tgtId = typeof link.target === 'object' ? link.target.id : link.target;
-      connectedIds.add(srcId);
-      connectedIds.add(tgtId);
+      connectedIds.add(typeof link.source === 'object' ? link.source.id : link.source);
+      connectedIds.add(typeof link.target === 'object' ? link.target.id : link.target);
     }
 
     const centerRadius = 80;
@@ -115,7 +96,7 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
       const isConn = connectedIds.has(node.id);
       node._connected = isConn;
 
-      if (node._targetX === undefined) {
+      if (node.fx === undefined) {
         let tx, ty, tz;
         if (isConn) {
           tx = (Math.random() - 0.5) * centerRadius * 2;
@@ -130,17 +111,12 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
           tz = r * Math.cos(phi);
         }
 
-        node._targetX = tx;
-        node._targetY = ty;
-        node._targetZ = tz;
-
-        // Big Bang: start at center, burst outward
-        node.fx = 0;
-        node.fy = 0;
-        node.fz = 0;
+        node.fx = 0; node.fy = 0; node.fz = 0;
+        node.x = 0; node.y = 0; node.z = 0;
 
         animate(node, {
           fx: tx, fy: ty, fz: tz,
+          x: tx, y: ty, z: tz,
           duration: 3000 + Math.random() * 2000,
           delay: 0,
           ease: 'easeOutQuint'
@@ -148,313 +124,216 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
       }
     }
 
-    setDataSource(isLive ? 'live' : 'simulated');
-    return { nodes, links };
-  }, [graphData]);
+    setTimeout(() => onDataSourceChange(isLive ? 'live' : 'simulated', nodes.length, links.length), 0);
+    return { nodes, links, isLive };
+  }, [graphData, onDataSourceChange]);
 
-  // ============================================================
-  // 2. Sync instanced meshes every frame (the 120fps engine)
-  // ============================================================
-  const syncInstancedMeshes = useCallback(() => {
+  // 2. Physics Simulation for Live Data
+  const simulation = useMemo(() => {
+    if (!displayData.isLive) return null;
+    return forceSimulation(displayData.nodes)
+      .force('link', forceLink(displayData.links).id(d => d.id).distance(18).strength(0.5))
+      .force('charge', forceManyBody().strength(-4).distanceMax(150))
+      .force('center', forceCenter(0, 0, 0))
+      .numDimensions(3);
+  }, [displayData]);
+
+  // 3. Build colors and arrays once
+  const { nodeColors, lineColors, linePositions } = useMemo(() => {
+    const nColors = new Float32Array(displayData.nodes.length * 3);
+    for (let i = 0; i < displayData.nodes.length; i++) {
+      const node = displayData.nodes[i];
+      const isDefault = node.is_default === 1;
+      const score = node.credit_score || 500;
+      let c = NODE_COLORS.low;
+      if (isDefault) c = NODE_COLORS.default;
+      else if (score > 750) c = NODE_COLORS.high;
+      else if (score > 600) c = NODE_COLORS.mid;
+      nColors[i*3+0] = c.r; nColors[i*3+1] = c.g; nColors[i*3+2] = c.b;
+    }
+
+    const eCount = displayData.links.length;
+    const edgeColors = isDark ? EDGE_COLORS_DARK : EDGE_COLORS_LIGHT;
+    const defaultColor = isDark ? DEFAULT_EDGE_DARK : DEFAULT_EDGE_LIGHT;
+    const lColors = new Float32Array(eCount * 6);
+    for (let i = 0; i < eCount; i++) {
+      const link = displayData.links[i];
+      const c = edgeColors[link.type] || defaultColor;
+      lColors[i*6+0] = c.r; lColors[i*6+1] = c.g; lColors[i*6+2] = c.b;
+      lColors[i*6+3] = c.r; lColors[i*6+4] = c.g; lColors[i*6+5] = c.b;
+    }
+
+    const lPos = new Float32Array(eCount * 6);
+    return { nodeColors: nColors, lineColors: lColors, linePositions: lPos };
+  }, [displayData, isDark]);
+
+  // 4. Render loop
+  useFrame(() => {
+    if (simulation) simulation.tick();
+    
     const nodes = displayData.nodes;
     const links = displayData.links;
-    if (!nodes) return;
-
-    // Update node InstancedMesh positions
-    const instanced = instancedRef.current;
-    if (instanced && nodes.length > 0) {
+    
+    if (instancedRef.current) {
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
-        const isDefault = node.is_default === 1;
         const isConnected = node._connected;
-        const size = isConnected ? (isDefault ? 1.2 : 0.7) : 0.65;
-
+        const size = isConnected ? (node.is_default === 1 ? 1.2 : 0.7) : 0.65;
+        // Use fx/fy/fz if set (simulated), else x/y/z (live physics)
         _dummy.position.set(node.fx ?? node.x ?? 0, node.fy ?? node.y ?? 0, node.fz ?? node.z ?? 0);
         _dummy.scale.set(size, size, size);
         _dummy.updateMatrix();
-        instanced.setMatrixAt(i, _dummy.matrix);
+        instancedRef.current.setMatrixAt(i, _dummy.matrix);
       }
-      instanced.instanceMatrix.needsUpdate = true;
+      instancedRef.current.instanceMatrix.needsUpdate = true;
     }
 
-    // Update edge LineSegments positions
-    const lineSeg = edgeMeshRef.current;
-    if (lineSeg && links && links.length > 0) {
-      const posArr = lineSeg.geometry.attributes.position.array;
+    if (linesRef.current && links.length > 0) {
+      const pos = linesRef.current.geometry.attributes.position.array;
       for (let i = 0; i < links.length; i++) {
         const link = links[i];
         const src = typeof link.source === 'object' ? link.source : nodes.find(n => n.id === link.source);
         const tgt = typeof link.target === 'object' ? link.target : nodes.find(n => n.id === link.target);
         if (src && tgt) {
-          posArr[i * 6 + 0] = src.fx ?? src.x ?? 0;
-          posArr[i * 6 + 1] = src.fy ?? src.y ?? 0;
-          posArr[i * 6 + 2] = src.fz ?? src.z ?? 0;
-          posArr[i * 6 + 3] = tgt.fx ?? tgt.x ?? 0;
-          posArr[i * 6 + 4] = tgt.fy ?? tgt.y ?? 0;
-          posArr[i * 6 + 5] = tgt.fz ?? tgt.z ?? 0;
+          pos[i*6+0] = src.fx ?? src.x ?? 0; pos[i*6+1] = src.fy ?? src.y ?? 0; pos[i*6+2] = src.fz ?? src.z ?? 0;
+          pos[i*6+3] = tgt.fx ?? tgt.x ?? 0; pos[i*6+4] = tgt.fy ?? tgt.y ?? 0; pos[i*6+5] = tgt.fz ?? tgt.z ?? 0;
         }
       }
-      lineSeg.geometry.attributes.position.needsUpdate = true;
+      linesRef.current.geometry.attributes.position.needsUpdate = true;
     }
-  }, [displayData]);
+  });
 
-  // ============================================================
-  // 4. Effects (all hooks below — no early returns between hooks)
-  // ============================================================
+  return (
+    <group>
+      <instancedMesh ref={instancedRef} args={[null, null, displayData.nodes.length]}>
+        <sphereGeometry args={[1, 8, 8]}>
+          <instancedBufferAttribute attach="attributes-color" args={[nodeColors, 3]} />
+        </sphereGeometry>
+        <meshBasicMaterial vertexColors toneMapped={false} />
+      </instancedMesh>
+      
+      {displayData.links.length > 0 && (
+        <lineSegments ref={linesRef}>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" count={linePositions.length / 3} array={linePositions} itemSize={3} usage={THREE.DynamicDrawUsage} />
+            <bufferAttribute attach="attributes-color" count={lineColors.length / 3} array={lineColors} itemSize={3} />
+          </bufferGeometry>
+          <lineBasicMaterial vertexColors transparent opacity={0.18} toneMapped={false} />
+        </lineSegments>
+      )}
+    </group>
+  );
+};
 
-  // FPS Counter
+// ============================================================
+// Camera Controller
+// ============================================================
+const CameraManager = ({ isInteractive }) => {
+  const cameraControlRef = useRef();
+
   useEffect(() => {
-    let frameCount = 0;
-    let lastTime = performance.now();
-    let rafId;
-    const measure = () => {
-      frameCount++;
-      const now = performance.now();
-      if (now - lastTime >= 1000) {
-        setFps(frameCount);
-        frameCount = 0;
-        lastTime = now;
-      }
-      rafId = requestAnimationFrame(measure);
-    };
-    rafId = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(rafId);
+    if (cameraControlRef.current) {
+      cameraControlRef.current.setLookAt(0, 20, 380, 0, 0, 0, false);
+      
+      const timeout = setTimeout(() => {
+        if (!isInteractive && cameraControlRef.current) {
+          cameraControlRef.current.setLookAt(0, 0, 250, 0, 0, 0, true);
+        }
+      }, 4500);
+      return () => clearTimeout(timeout);
+    }
   }, []);
 
-  // Auto-rotate (only when NOT interactive)
-  useEffect(() => {
-    if (!fgRef.current) return;
-    const fg = fgRef.current;
-
-    if (isInteractive) {
-      if (rotateRef.current) {
-        clearInterval(rotateRef.current);
-        rotateRef.current = null;
-      }
-      return;
+  useFrame((state, delta) => {
+    if (!isInteractive && cameraControlRef.current) {
+      cameraControlRef.current.azimuthAngle += 0.05 * delta;
     }
+  });
 
-    fg.cameraPosition({ x: 0, y: 0, z: 380 });
-    let angle = 0;
-    const rotate = () => {
-      angle += 0.0006;
-      const distance = 380;
-      fg.cameraPosition({
-        x: distance * Math.sin(angle),
-        y: 40 * Math.sin(angle * 0.3),
-        z: distance * Math.cos(angle),
-      });
-    };
-    rotateRef.current = setInterval(rotate, 30);
-    return () => {
-      if (rotateRef.current) clearInterval(rotateRef.current);
-    };
-  }, [isInteractive]);
+  return (
+    <CameraControls 
+      ref={cameraControlRef} 
+      enabled={true} 
+      mouseButtons={{
+        left: isInteractive ? 1 : 0,
+        middle: 0,
+        right: isInteractive ? 2 : 0,
+        wheel: isInteractive ? 8 : 0
+      }}
+      touches={{
+        one: isInteractive ? 1 : 0,
+        two: isInteractive ? 2 : 0,
+        three: isInteractive ? 3 : 0
+      }}
+      dollySpeed={1.2}
+      azimuthRotateSpeed={0.8}
+      polarRotateSpeed={0.8}
+      dampingFactor={0.1}
+    />
+  );
+};
 
-  // Toggle interactive controls (zoom, pan, rotate)
-  useEffect(() => {
-    if (!fgRef.current) return;
-    const controls = fgRef.current.controls();
-    if (controls) {
-      controls.enabled = !!isInteractive;
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.1;
-      controls.rotateSpeed = 0.8;
-      controls.zoomSpeed = 1.2;
-    }
-  }, [isInteractive]);
+// ============================================================
+// 3D Glass UI
+// ============================================================
+const GlassFloatingCards = ({ isDark }) => {
+  return (
+    <group position={[0, -20, 150]} rotation={[0, 0, 0]}>
+      {/* Huge glass backdrop for Hero Section */}
+      <mesh>
+        <planeGeometry args={[140, 80]} />
+        <MeshTransmissionMaterial 
+          background={new THREE.Color(isDark ? '#000000' : '#F4F5F7')}
+          thickness={15}
+          roughness={0.15}
+          transmission={1}
+          ior={1.2}
+          chromaticAberration={0.08}
+          anisotropy={0.3}
+          distortion={0.5}
+          distortionScale={0.5}
+          temporalDistortion={0.1}
+          color={isDark ? '#1a1a2e' : '#ffffff'}
+        />
+      </mesh>
+    </group>
+  );
+};
 
-  // GPU detection + renderer setup
-  useEffect(() => {
-    if (!fgRef.current) return;
-    const renderer = fgRef.current.renderer();
-    if (!renderer) {
-      setWebglError(true);
-      return;
-    }
-
-    renderer.setClearColor(isDark ? 0x000000 : 0xF4F5F7, 1);
-
-    try {
-      const gl = renderer.getContext();
-      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-      const gpuName = dbg
-        ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
-        : gl.getParameter(gl.RENDERER);
-      console.log('Active renderer:', gpuName);
-      setActiveGpu(gpuName);
-
-      const lower = gpuName.toLowerCase();
-      if (lower.includes('swiftshader') || lower.includes('llvmpipe') || lower.includes('software')) {
-        console.warn('⚠ Software rasterizer detected!');
-        setWebglError(true);
-        return;
-      }
-    } catch (e) {
-      console.warn('Could not detect GPU:', e);
-    }
-
-    const fg = fgRef.current;
-    if (fg.d3Force) {
-      const charge = fg.d3Force('charge');
-      if (charge) charge.strength(-4).distanceMax(150);
-      const link = fg.d3Force('link');
-      if (link) link.distance(18).strength(0.5);
-    }
-  }, [isDark]);
-
-  // Build instanced rendering objects
-  useEffect(() => {
-    if (!fgRef.current) return;
-    const scene = fgRef.current.scene();
-    if (!scene) return;
-
-    // Clean up previous instances
-    if (instancedRef.current) {
-      scene.remove(instancedRef.current);
-      instancedRef.current.dispose();
-    }
-    if (edgeMeshRef.current) {
-      scene.remove(edgeMeshRef.current);
-      edgeMeshRef.current.geometry.dispose();
-      edgeMeshRef.current.material.dispose();
-    }
-
-    // ---- InstancedMesh for nodes (1 draw call) ----
-    const nCount = displayData.nodes?.length || 0;
-    if (nCount > 0) {
-      const mat = new THREE.MeshBasicMaterial();
-      const instanced = new THREE.InstancedMesh(sharedSphereGeometry, mat, nCount);
-      instanced.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-
-      for (let i = 0; i < nCount; i++) {
-        const node = displayData.nodes[i];
-        const isDefault = node.is_default === 1;
-        const score = node.credit_score || 500;
-
-        if (isDefault)        _color.copy(NODE_COLORS.default);
-        else if (score > 750) _color.copy(NODE_COLORS.high);
-        else if (score > 600) _color.copy(NODE_COLORS.mid);
-        else                  _color.copy(NODE_COLORS.low);
-
-        instanced.setColorAt(i, _color);
-      }
-      instanced.instanceColor.needsUpdate = true;
-      scene.add(instanced);
-      instancedRef.current = instanced;
-    }
-
-    // ---- LineSegments for edges (1 draw call) ----
-    const eCount = displayData.links?.length || 0;
-    if (eCount > 0) {
-      const positions = new Float32Array(eCount * 6);
-      const colors = new Float32Array(eCount * 6);
-
-      const edgeColors = isDark ? EDGE_COLORS_DARK : EDGE_COLORS_LIGHT;
-      const defaultColor = isDark ? DEFAULT_EDGE_DARK : DEFAULT_EDGE_LIGHT;
-
-      for (let i = 0; i < eCount; i++) {
-        const link = displayData.links[i];
-        const c = edgeColors[link.type] || defaultColor;
-        colors[i * 6 + 0] = c.r; colors[i * 6 + 1] = c.g; colors[i * 6 + 2] = c.b;
-        colors[i * 6 + 3] = c.r; colors[i * 6 + 4] = c.g; colors[i * 6 + 5] = c.b;
-      }
-
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      geo.attributes.position.setUsage(THREE.DynamicDrawUsage);
-
-      const lineMat = new THREE.LineBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.18,
-      });
-      const lineSegments = new THREE.LineSegments(geo, lineMat);
-      scene.add(lineSegments);
-      edgeMeshRef.current = lineSegments;
-    }
-
-    return () => {
-      if (instancedRef.current) {
-        scene.remove(instancedRef.current);
-        instancedRef.current.dispose();
-        instancedRef.current = null;
-      }
-      if (edgeMeshRef.current) {
-        scene.remove(edgeMeshRef.current);
-        edgeMeshRef.current.geometry.dispose();
-        edgeMeshRef.current.material.dispose();
-        edgeMeshRef.current = null;
-      }
-    };
-  }, [displayData, isDark]);
-
-  // Auto-fit to screen after Big Bang animation settles
-  useEffect(() => {
-    if (!fgRef.current || !graphData || !graphData.nodes || graphData.nodes.length === 0) return;
-    const timeout = setTimeout(() => {
-      if (fgRef.current) {
-        fgRef.current.zoomToFit(1200, 40);
-      }
-    }, 4500);
-    return () => clearTimeout(timeout);
-  }, [graphData]);
-
-  // ============================================================
-  // 5. Render
-  // ============================================================
-  const nodeCount = displayData.nodes?.length || 0;
-  const edgeCount = displayData.links?.length || 0;
-
-  // Fallback UI when hardware acceleration is unavailable
-  if (webglError) {
-    return (
-      <div className="fixed inset-0 z-0 flex items-center justify-center" style={{ background: isDark ? '#000000' : '#F4F5F7' }}>
-        <div className="text-center p-8 border border-red-500/30 rounded-2xl bg-red-500/10 backdrop-blur-md max-w-md">
-          <div className="text-4xl mb-3">⚠️</div>
-          <h2 className="text-xl font-bold text-red-400 mb-2">Hardware Acceleration Required</h2>
-          <p className="text-sm text-gray-400 leading-relaxed">
-            Your browser is using a software renderer instead of your GPU.
-            Please enable hardware acceleration in your browser settings.
-          </p>
-          <p className="text-xs text-gray-500 mt-3">
-            Chrome: Settings → System → &quot;Use hardware acceleration when available&quot;
-          </p>
-        </div>
-      </div>
-    );
-  }
+// ============================================================
+// Main Component
+// ============================================================
+export default function NetworkBackground({ graphData, isInteractive, onNodeClick }) {
+  const [stats, setStats] = useState({ source: 'simulated', nodes: 0, edges: 0 });
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   return (
     <div className="fixed inset-0 z-0 transition-colors duration-300" style={{ background: isDark ? '#000000' : '#F4F5F7' }}>
-      <ForceGraph3D
-        ref={fgRef}
-        rendererConfig={{
-          powerPreference: 'high-performance',
-          antialias: true,
-          alpha: false,
-          failIfMajorPerformanceCaveat: true,
-        }}
-        graphData={displayData}
-        nodeVisibility={false}
-        linkVisibility={false}
-        onEngineTick={syncInstancedMeshes}
-        enableNavigationControls={!!isInteractive}
-        enableNodeDrag={false}
-        enablePointerInteraction={false}
-        backgroundColor={isDark ? '#000000' : '#F4F5F7'}
-        showNavInfo={false}
-        cooldownTicks={Infinity}
-        warmupTicks={0}
-        d3AlphaDecay={0}
-        d3VelocityDecay={1}
-        d3AlphaMin={0.005}
-        width={window.innerWidth}
-        height={window.innerHeight}
-      />
+      <Canvas
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        camera={{ position: [0, 20, 380], fov: 45 }}
+        dpr={[1, 2]}
+      >
+        <color attach="background" args={[isDark ? '#000000' : '#F4F5F7']} />
+        
+        <CameraManager isInteractive={isInteractive} />
+        
+        <GraphGeometry 
+          graphData={graphData} 
+          isDark={isDark} 
+          onDataSourceChange={(s, n, e) => setStats({ source: s, nodes: n, edges: e })} 
+        />
+        
+        {!isInteractive && <GlassFloatingCards isDark={isDark} />}
 
-      {/* Stats Badge */}
+        <EffectComposer disableNormalPass>
+          <Bloom luminanceThreshold={0.5} mipmapBlur intensity={1.5} />
+          <DepthOfField focusDistance={0.02} focalLength={0.1} bokehScale={2} />
+        </EffectComposer>
+      </Canvas>
+
+      {/* Stats Badge Overlay */}
       <div
         style={{
           position: 'absolute',
@@ -466,88 +345,20 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
           gap: '8px',
           padding: '8px 14px',
           borderRadius: '20px',
-          background: dataSource === 'live'
-            ? 'rgba(48, 209, 88, 0.12)'
-            : 'rgba(212, 175, 55, 0.12)',
-          border: `1px solid ${dataSource === 'live'
-            ? 'rgba(48, 209, 88, 0.3)'
-            : 'rgba(212, 175, 55, 0.3)'}`,
+          background: stats.source === 'live' ? 'rgba(48, 209, 88, 0.12)' : 'rgba(212, 175, 55, 0.12)',
+          border: `1px solid ${stats.source === 'live' ? 'rgba(48, 209, 88, 0.3)' : 'rgba(212, 175, 55, 0.3)'}`,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          transition: 'all 0.6s ease',
           fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif",
         }}
       >
-        {/* FPS Counter */}
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 700,
-            color: fps >= 50 ? '#30D158' : fps >= 25 ? '#FACC15' : '#FF453A',
-            minWidth: '48px',
-          }}
-        >
-          {fps} FPS
+        <span style={{ fontSize: '11px', fontWeight: 600, color: stats.source === 'live' ? '#30D158' : '#D4AF37' }}>
+          {stats.source === 'live' ? '● Live Graph' : '⟳ Simulated Data'}
         </span>
-        <span style={{ width: '1px', height: '14px', background: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }} />
-        <span
-          style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: dataSource === 'live' ? '#30D158' : '#D4AF37',
-            boxShadow: dataSource === 'live'
-              ? '0 0 6px rgba(48, 209, 88, 0.6)'
-              : '0 0 6px rgba(212, 175, 55, 0.6)',
-            animation: dataSource === 'simulated' ? 'pulse-dot 2s ease-in-out infinite' : 'none',
-          }}
-        />
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            letterSpacing: '0.03em',
-            color: dataSource === 'live' ? 'rgba(48, 209, 88, 0.9)' : 'rgba(180, 150, 30, 0.9)',
-          }}
-        >
-          {dataSource === 'live' ? '● Live Graph' : '⟳ Simulated Data'}
+        <span style={{ fontSize: '10px', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)' }}>
+          {stats.nodes.toLocaleString()} nodes · {stats.edges.toLocaleString()} edges
         </span>
-        <span
-          style={{
-            fontSize: '10px',
-            fontWeight: 500,
-            color: isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(15, 35, 80, 0.45)',
-          }}
-        >
-          {nodeCount.toLocaleString()} nodes{edgeCount > 0 ? ` · ${edgeCount.toLocaleString()} edges` : ''}
-        </span>
-        {activeGpu && (
-          <span
-            style={{
-              fontSize: '9px',
-              fontWeight: 600,
-              color: '#A855F7',
-              borderLeft: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
-              paddingLeft: '8px',
-              maxWidth: '200px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            🎮 {activeGpu}
-          </span>
-        )}
       </div>
-
-      <style>{`
-        @keyframes pulse-dot {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.7); }
-        }
-      `}</style>
     </div>
   );
-};
-
-export default React.memo(NetworkBackground);
+}
