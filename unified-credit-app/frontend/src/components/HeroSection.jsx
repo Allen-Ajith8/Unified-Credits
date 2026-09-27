@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { AnimatedTitle } from './AnimatedTitle';
 
 const container = {
   hidden: { opacity: 0 },
@@ -23,28 +24,24 @@ const HeroSection = () => (
       className="text-center max-w-4xl mx-auto"
     >
       <motion.div variants={item} className="mb-6">
-        <span className="inline-block px-4 py-1.5 rounded-full bg-[#0F2350]/5 border border-[#0F2350]/10 text-[#0F2350]/70 text-xs font-semibold tracking-widest uppercase">
+        <span className="inline-block px-4 py-1.5 rounded-full bg-[#0F2350]/5 dark:bg-white/10 border border-[#0F2350]/10 dark:border-white/10 text-[#0F2350]/70 dark:text-white/70 text-xs font-semibold tracking-widest uppercase">
           Data Science Project
         </span>
       </motion.div>
-      <motion.h1 variants={item}
-        className="text-5xl md:text-7xl lg:text-8xl font-bold text-[#0F2350] tracking-tight leading-[1.05] mb-6"
-      >
-        The Unified<br />Credit Engine
-      </motion.h1>
+      <AnimatedTitle text="The Unified Credit Engine" className="text-5xl md:text-7xl lg:text-8xl font-bold text-[#0F2350] dark:text-white tracking-tight leading-[1.05] mb-6" />
       <motion.p variants={item}
-        className="text-lg md:text-xl text-[#0F2350]/60 max-w-2xl mx-auto mb-10 leading-relaxed font-medium"
+        className="text-lg md:text-xl text-[#0F2350]/60 dark:text-white/60 max-w-2xl mx-auto mb-10 leading-relaxed font-medium"
       >
         Integrating Cash Flow Analytics & Network Contagion Mapping for Holistic Risk Assessment
       </motion.p>
       <motion.div variants={item} className="flex flex-wrap gap-4 justify-center">
         <a href="#dashboard"
-          className="px-8 py-3.5 rounded-full bg-[#0F2350] text-white text-sm font-semibold hover:bg-[#006A67] transition-all hover:scale-105 shadow-lg shadow-[#0F2350]/20"
+          className="px-8 py-3.5 rounded-full bg-[#0F2350] dark:bg-white text-white dark:text-black text-sm font-semibold hover:bg-[#006A67] dark:hover:bg-gray-200 transition-all hover:scale-105 shadow-lg shadow-[#0F2350]/20"
         >
           View Live Dashboard ↓
         </a>
         <a href="#methodology"
-          className="px-8 py-3.5 rounded-full bg-white/50 backdrop-blur-xl border border-[#0F2350]/10 text-[#0F2350] text-sm font-semibold hover:bg-white/80 transition-all shadow-sm"
+          className="px-8 py-3.5 rounded-full bg-white/50 dark:bg-white/10 backdrop-blur-xl border border-[#0F2350]/10 dark:border-white/10 text-[#0F2350] dark:text-white text-sm font-semibold hover:bg-white/80 dark:hover:bg-white/20 transition-all shadow-sm"
         >
           Explore Methodology
         </a>

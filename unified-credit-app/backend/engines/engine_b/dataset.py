@@ -32,12 +32,14 @@ RELATION_DEFS = {
     'Device_ID': 'shared_device',
     'IP_Address': 'shared_ip',
     'UPI_VPA': 'shared_upi',
+    'Loan_Purpose': 'shared_loan_purpose',
 }
 
 EDGE_TYPE_LABELS = {
     'shared_device': 'Shared Device',
     'shared_ip': 'Shared IP',
     'shared_upi': 'Shared UPI',
+    'shared_loan_purpose': 'Shared Loan Purpose',
 }
 
 
@@ -68,7 +70,9 @@ def build_hetero_data(
     n = len(df)
 
     # --- Node features ---
-    X = df[TABULAR_FEATURES].fillna(0).values.astype(np.float32)
+    ADVANCED_FEATURES = ['CIBIL_Score', 'Utility_Payment_Consistency', 'Salary_Deposit_Regularity', 'Interest_Rate']
+    ALL_FEATURES = TABULAR_FEATURES + ADVANCED_FEATURES
+    X = df[ALL_FEATURES].fillna(0).values.astype(np.float32)
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X).astype(np.float32)
 
@@ -95,7 +99,7 @@ def build_hetero_data(
             idx_list = indices.tolist()
             # Connect pairs within group, cap fan-out to avoid combinatorial explosion
             for i in range(len(idx_list)):
-                for j in range(i + 1, min(i + 10, len(idx_list))):
+                for j in range(i + 1, min(i + 15, len(idx_list))):
                     src_list.append(idx_list[i])
                     dst_list.append(idx_list[j])
 

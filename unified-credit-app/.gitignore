@@ -1,0 +1,15 @@
+.env
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+.DS_Store
+*.egg-info/
+.pytest_cache/
+frontend/node_modules/
+backend/__pycache__/
+backend/.venv/
+backend/*.egg-info/
+.cognee/

@@ -26,7 +26,7 @@ const AICopilot = ({ onClose, selectedNode }) => {
 
   // Check copilot status
   useEffect(() => {
-    fetch('http://localhost:8000/api/copilot/status')
+    fetch('/api/copilot/status')
       .then(r => r.json())
       .then(data => setCopilotStatus(data))
       .catch(() => setCopilotStatus({ ingested: false, error: 'Backend not reachable' }));
@@ -48,7 +48,7 @@ const AICopilot = ({ onClose, selectedNode }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

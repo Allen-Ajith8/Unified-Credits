@@ -1,13 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TableProperties, Network, GitCompare } from 'lucide-react';
 import { engineMetrics } from '../data/dashboardMetrics';
 
+import { useTheme } from 'next-themes';
+
 const ModelToggle = ({ activeMode, setActiveMode }) => {
+  const { resolvedTheme, theme } = useTheme();
+  const [mounted, setMounted] = useState(false); useEffect(() => setMounted(true), []); const isDark = mounted && (resolvedTheme === 'dark' || theme === 'dark');
+
   const options = [
-    { id: 'a', icon: TableProperties, ...engineMetrics.a },
-    { id: 'b', icon: Network, ...engineMetrics.b },
-    { id: 'c', icon: GitCompare, ...engineMetrics.c },
+    { id: 'a', icon: TableProperties, ...engineMetrics.a, accentColor: isDark ? '#3B82F6' : engineMetrics.a.accentColor },
+    { id: 'b', icon: Network, ...engineMetrics.b, accentColor: isDark ? '#A855F7' : engineMetrics.b.accentColor },
+    { id: 'c', icon: GitCompare, ...engineMetrics.c, accentColor: isDark ? '#FACC15' : engineMetrics.c.accentColor },
   ];
 
   return (
@@ -34,7 +39,7 @@ const ModelToggle = ({ activeMode, setActiveMode }) => {
               
               <Icon className={`w-5 h-5 relative z-10 ${isActive ? 'text-white' : 'text-[#86868B]'}`} />
               <div className="flex flex-col items-start relative z-10">
-                <span className={`text-sm font-semibold tracking-tight ${isActive ? 'text-white' : 'text-[#0F2350]'}`}>
+                <span className={`text-sm font-semibold tracking-tight ${isActive ? 'text-white' : 'text-[#0F2350] dark:text-white'}`}>
                   {option.name}
                 </span>
                 <span className={`text-xs ${isActive ? 'text-white/80' : 'text-[#86868B]'}`}>

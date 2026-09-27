@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const LoadingScreen = ({ ready, onSkip }) => {
   const [progress, setProgress] = useState(0);
@@ -79,10 +79,10 @@ const LoadingScreen = ({ ready, onSkip }) => {
           </div>
         </div>
 
-        <h1 className="text-3xl md:text-4xl font-semibold text-[#0F2350] mb-3 tracking-tight">
+        <h1 className="text-3xl md:text-4xl font-semibold text-[#0F2350] dark:text-white mb-3 tracking-tight">
           Unified Credit Engine
         </h1>
-        <p className="text-[#0F2350]/50 text-sm md:text-base mb-12">
+        <p className="text-[#0F2350] dark:text-white/50 text-sm md:text-base mb-12">
           Initializing 3D network constellation{dots}
         </p>
 
@@ -99,10 +99,10 @@ const LoadingScreen = ({ ready, onSkip }) => {
             />
           </div>
           <div className="flex justify-between mt-3">
-            <span className="text-[#0F2350]/30 text-xs">
+            <span className="text-[#0F2350] dark:text-white/30 text-xs">
               {progress < 100 ? 'Loading 3D graph...' : 'Ready'}
             </span>
-            <span className="text-[#0F2350]/30 text-xs font-mono">
+            <span className="text-[#0F2350] dark:text-white/30 text-xs font-mono">
               {Math.round(progress)}%
             </span>
           </div>
@@ -114,7 +114,7 @@ const LoadingScreen = ({ ready, onSkip }) => {
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5 }}
           onClick={onSkip}
-          className="px-6 py-2.5 rounded-full text-sm text-[#0F2350]/60 border border-white/15 hover:text-[#0F2350] hover:border-white/40 hover:bg-white/5 transition-all duration-300 cursor-pointer"
+          className="px-6 py-2.5 rounded-full text-sm text-[#0F2350] dark:text-white/60 border border-white/15 hover:text-[#0F2350] dark:text-white hover:border-white/40 hover:bg-white/5 transition-all duration-300 cursor-pointer"
         >
           Skip →
         </motion.button>

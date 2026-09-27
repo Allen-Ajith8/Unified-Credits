@@ -196,9 +196,9 @@ def explain_node(
         "node_id": node_id,
         "name": str(row.get('Customer_ID', f'Borrower {node_id}')),
         "credit_score": int(row.get('CIBIL_Score', 0)),
-        "annual_income": float(row.get('annual_income', 0)),
-        "loan_amount": float(row.get('loan_amount', 0)),
-        "debt_to_income_ratio": float(row.get('debt_to_income_ratio', 0)),
+        "annual_income": float(row.get('Verified_Monthly_Income', 0)) * 12,
+        "loan_amount": float(row.get('Loan_Amount', 0)),
+        "debt_to_income_ratio": float(row.get('Debt_to_Income_Ratio', 0)),
     }
 
     # Subgraph data (1-hop neighborhood)

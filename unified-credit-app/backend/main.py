@@ -14,6 +14,7 @@ import os
 import sys
 import json
 import asyncio
+import io
 import random
 import numpy as np
 import pandas as pd
@@ -34,10 +35,21 @@ from engines.engine_b import explain_router, set_engine_state
 from engines.copilot import ingest_credit_data, ask_copilot, get_copilot_status
 
 # ============================================================
-# Configuration
+# Configuration (env-based with sensible defaults)
 # ============================================================
-FINANCIAL_CSV = Path(__file__).parent.parent.parent / "Dataset" / "financial_underwriting_data.csv"
-FRAUD_CSV = Path(__file__).parent.parent.parent / "Dataset" / "fraud_network_edges.csv"
+DATASET_DIR = Path(os.environ.get(
+    "DATASET_DIR",
+    str(Path(__file__).parent.parent.parent / "Dataset")
+))
+FINANCIAL_CSV = DATASET_DIR / "financial_underwriting_data.csv"
+FRAUD_CSV = DATASET_DIR / "fraud_network_edges.csv"
+
+BACKEND_HOST = os.environ.get("BACKEND_HOST", "0.0.0.0")
+BACKEND_PORT = int(os.environ.get("BACKEND_PORT", "8000"))
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000"
+).split(",")
 
 # Global state
 engine_results = {
@@ -114,7 +126,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -316,7 +328,7 @@ async def upload_dataset(
     try:
         if merged_file is not None:
             contents = await merged_file.read()
-            new_df = pd.read_csv(pd.io.common.BytesIO(contents))
+            new_df = pd.read_csv(io.BytesIO(contents))
             # Assume it has all required columns. We split it back conceptually or just use it.
             # But run_all_engines takes financial_df and fraud_df. 
             # If we upload a merged one, we can pass it as both and merge will be a no-op / just columns overlap.
@@ -327,21 +339,39 @@ async def upload_dataset(
         elif financial_file is not None and fraud_file is not None:
             fin_contents = await financial_file.read()
             fraud_contents = await fraud_file.read()
-            current_financial_df = pd.read_csv(pd.io.common.BytesIO(fin_contents))
-            current_fraud_df = pd.read_csv(pd.io.common.BytesIO(fraud_contents))
+            current_financial_df = pd.read_csv(io.BytesIO(fin_contents))
+            current_fraud_df = pd.read_csv(io.BytesIO(fraud_contents))
             current_df = pd.merge(current_financial_df, current_fraud_df, on='Customer_ID', how='inner')
         else:
             return JSONResponse(status_code=400, content={"error": "Provide either both financial_file and fraud_file, or a merged_file."})
             
         print(f"\nUploaded new data ({len(current_df)} rows)")
         
-        # Validate required columns
-        required = ['Target_Default'] + engine_a.TABULAR_FEATURES[:5]
-        missing = [c for c in required if c not in current_df.columns]
+        # Validate required columns (comprehensive schema check)
+        REQUIRED_FINANCIAL = ['Customer_ID', 'Target_Default'] + engine_a.TABULAR_FEATURES
+        REQUIRED_FRAUD = ['Customer_ID', 'Device_ID', 'IP_Address']
+        
+        if len(current_df) == 0:
+            return JSONResponse(status_code=400, content={
+                "error": "Uploaded CSV is empty (0 rows after merge)."
+            })
+        
+        missing_fin = [c for c in REQUIRED_FINANCIAL if c not in current_df.columns]
+        missing_fraud = [c for c in REQUIRED_FRAUD if c not in current_df.columns]
+        missing = missing_fin + missing_fraud
         if missing:
             return JSONResponse(status_code=400, content={
                 "error": f"Missing required columns: {missing}",
-                "required": required,
+                "required_financial": REQUIRED_FINANCIAL,
+                "required_fraud": REQUIRED_FRAUD,
+                "received_columns": list(current_df.columns),
+            })
+        
+        # Validate Target_Default is binary
+        unique_targets = current_df['Target_Default'].dropna().unique()
+        if not set(unique_targets).issubset({0, 1}):
+            return JSONResponse(status_code=400, content={
+                "error": f"Target_Default must be binary (0/1). Found: {sorted(unique_targets.tolist())}",
             })
             
         # Re-run all engines
@@ -416,9 +446,9 @@ async def websocket_live_metrics(ws: WebSocket):
             await ws.send_json({
                 "type": "initial",
                 "total_processed": len(current_df) if current_df is not None else 0,
-                "running_default_rate": engine_results["a"]["metrics"]["defaultRate"],
-                "running_roc_auc": engine_results["b"]["metrics"]["rocAuc"],
-                "fraud_alerts": engine_results["c"]["metrics"]["falseNegativesCaught"],
+                "running_default_rate": engine_results["a"]["metrics"]["defaultRate"] if engine_results["a"] else 0,
+                "running_roc_auc": engine_results["b"]["metrics"]["rocAuc"] if engine_results["b"] else (engine_results["a"]["metrics"]["rocAuc"] if engine_results["a"] else 0),
+                "fraud_alerts": engine_results["c"]["metrics"]["falseNegativesCaught"] if engine_results["c"] else 0,
             })
         
         # Keep connection alive, push updates when they happen
@@ -432,9 +462,9 @@ async def websocket_live_metrics(ws: WebSocket):
                     await ws.send_json({
                         "type": "heartbeat",
                         "total_processed": len(current_df) if current_df is not None else 0,
-                        "running_default_rate": engine_results["a"]["metrics"]["defaultRate"],
-                        "running_roc_auc": engine_results["b"]["metrics"]["rocAuc"],
-                        "fraud_alerts": engine_results["c"]["metrics"]["falseNegativesCaught"],
+                        "running_default_rate": engine_results["a"]["metrics"]["defaultRate"] if engine_results["a"] else 0,
+                        "running_roc_auc": engine_results["b"]["metrics"]["rocAuc"] if engine_results["b"] else (engine_results["a"]["metrics"]["rocAuc"] if engine_results["a"] else 0),
+                        "fraud_alerts": engine_results["c"]["metrics"]["falseNegativesCaught"] if engine_results["c"] else 0,
                     })
     
     except WebSocketDisconnect:
@@ -448,4 +478,4 @@ async def websocket_live_metrics(ws: WebSocket):
 # Run
 # ============================================================
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=BACKEND_HOST, port=BACKEND_PORT)

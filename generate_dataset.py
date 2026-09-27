@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore")
 # ============================================================
 # Configuration
 # ============================================================
-TOTAL_RECORDS = 40_000
+TOTAL_RECORDS = 4_000
 DEFAULT_RATE = 0.047  # Target: 4.5% to 5.0%
 FRAUD_RING_PCT = 0.30  # 30% of defaulters share devices/IPs
 NUM_FRAUD_RING_DEVICES = 50  # Small pool of shared devices
@@ -41,7 +41,7 @@ print("=" * 60)
 # ============================================================
 # Step 1: Generate Customer IDs and Target Variable
 # ============================================================
-print("\n[Step 1] Generating 40,000 Customer IDs and Target Variable...")
+print(f"\n[Step 1] Generating {TOTAL_RECORDS:,} Customer IDs and Target Variable...")
 
 n_defaults = int(TOTAL_RECORDS * DEFAULT_RATE)
 n_non_defaults = TOTAL_RECORDS - n_defaults
@@ -296,7 +296,7 @@ rate = financial_df['Target_Default'].mean() * 100
 print(f"  Default rate: {rate:.2f}% {'✓' if 4.5 <= rate <= 5.0 else '✗ OUT OF RANGE'}")
 
 # Check record count
-print(f"  Total records: {len(financial_df)} {'✓' if len(financial_df) == 40000 else '✗'}")
+print(f"  Total records: {len(financial_df)} {'✓' if len(financial_df) == TOTAL_RECORDS else '✗'}")
 
 # Check no restricted columns
 restricted = ['Zip_Code', 'Gender', 'Religion', 'Employer_Name', 'zip_code', 'gender', 'religion', 'employer_name']

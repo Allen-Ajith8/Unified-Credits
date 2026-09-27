@@ -21,6 +21,7 @@ os.environ.setdefault("EMBEDDING_PROVIDER", "ollama")
 os.environ.setdefault("EMBEDDING_MODEL", "nomic-embed-text:latest")
 os.environ.setdefault("EMBEDDING_ENDPOINT", "http://localhost:11434/api/embed")
 os.environ.setdefault("EMBEDDING_DIMENSIONS", "768")
+os.environ.setdefault("HUGGINGFACE_TOKENIZER", "nomic-ai/nomic-embed-text-v1.5")
 
 import cognee
 
@@ -56,24 +57,24 @@ async def ingest_credit_data(df: pd.DataFrame):
 
             for i in range(start, end):
                 row = df.iloc[i]
-                name = row.get('full_name', f'Borrower {i}')
-                credit_score = row.get('credit_score', 'N/A')
-                is_default = 'Yes' if row.get('default', 0) == 1 else 'No'
-                employer = row.get('employer_name', 'Unknown')
-                employer_id = row.get('employer_id', 'Unknown')
-                city = row.get('city', 'Unknown')
-                state = row.get('state', 'Unknown')
-                zip_code = row.get('zip_code', 'Unknown')
-                device_id = row.get('device_id', 'Unknown')
-                ip_address = row.get('ip_address', 'Unknown')
-                income = row.get('monthly_income', 'N/A')
-                dti = row.get('debt_to_income_ratio', 'N/A')
-                loan_amount = row.get('loan_amount', 'N/A')
-                loan_purpose = row.get('loan_purpose', 'N/A')
-                num_defaults = row.get('num_past_defaults', 0)
-                late_30 = row.get('num_late_payments_30d', 0)
-                late_60 = row.get('num_late_payments_60d', 0)
-                late_90 = row.get('num_late_payments_90d', 0)
+                name = row.get('Customer_ID', f'Borrower {i}')
+                credit_score = row.get('CIBIL_Score', 'N/A')
+                is_default = 'Yes' if row.get('Target_Default', 0) == 1 else 'No'
+                employer = row.get('GST_Filing_History', 'Unknown')
+                employer_id = row.get('Customer_ID', 'Unknown')
+                city = row.get('Loan_Purpose', 'Unknown')
+                state = 'N/A'
+                zip_code = 'N/A'
+                device_id = row.get('Device_ID', 'Unknown')
+                ip_address = row.get('IP_Address', 'Unknown')
+                income = row.get('Verified_Monthly_Income', 'N/A')
+                dti = row.get('Debt_to_Income_Ratio', 'N/A')
+                loan_amount = row.get('Loan_Amount', 'N/A')
+                loan_purpose = row.get('Loan_Purpose', 'N/A')
+                num_defaults = row.get('Num_Past_Defaults', 0)
+                late_30 = row.get('EMI_Bounce_Count', 0)
+                late_60 = 0
+                late_90 = 0
 
                 text = (
                     f"Borrower Row #{i}: {name}. "

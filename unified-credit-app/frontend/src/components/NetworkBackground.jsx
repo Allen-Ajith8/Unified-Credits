@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import * as THREE from 'three';
+import { animate } from 'animejs';
+import { useTheme } from 'next-themes';
 
 const EDGE_COLORS = {
   'Shared Device': '#006A67',      // Teal
@@ -12,16 +14,18 @@ const DEFAULT_EDGE_COLOR = '#0F2350';
 const NetworkBackground = ({ graphData, onNodeClick }) => {
   const fgRef = useRef();
   const [dataSource, setDataSource] = useState('simulated');
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   // Auto-rotate
   useEffect(() => {
     if (!fgRef.current) return;
     const fg = fgRef.current;
-    fg.cameraPosition({ x: 0, y: 0, z: 500 });
+    fg.cameraPosition({ x: 0, y: 0, z: 380 });
     let angle = 0;
     const rotate = () => {
       angle += 0.0006;
-      const distance = 500;
+      const distance = 380;
       fg.cameraPosition({
         x: distance * Math.sin(angle),
         y: 40 * Math.sin(angle * 0.3),
@@ -37,7 +41,7 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
     if (!fgRef.current) return;
     const renderer = fgRef.current.renderer();
     if (renderer) {
-      renderer.setClearColor(0xF4F5F7, 1);
+      renderer.setClearColor(isDark ? 0x000000 : 0xF4F5F7, 1);
     }
     const controls = fgRef.current.controls();
     if (controls) {
@@ -55,7 +59,7 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
         link.distance(18).strength(0.5);
       }
     }
-  }, []);
+  }, [isDark]);
 
   // Shared geometry for nodes — low-poly spheres for better performance with 40k nodes
   const sphereGeometry = useMemo(() => new THREE.SphereGeometry(1, 6, 6), []);
@@ -93,13 +97,15 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
     const size = isConnected
       ? (isDefault ? 1.2 : 0.7)
       : 0.65;
+      
     mesh.scale.set(size, size, size);
+    
     return mesh;
   }, [sphereGeometry]);
 
   // Edge color by type — returns CSS hex strings
   const linkColor = React.useCallback((link) => {
-    return EDGE_COLORS[link.type] || DEFAULT_EDGE_COLOR;
+    return isDark ? (link.type === 'Shared Device' ? '#2DD4BF' : link.type === 'Shared IP' ? '#A855F7' : link.type === 'Shared UPI' ? '#FACC15' : '#60A5FA') : (EDGE_COLORS[link.type] || DEFAULT_EDGE_COLOR);
   }, []);
 
   // Generate clustered placeholder data OR use real API data
@@ -171,21 +177,41 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
       node._connected = isConn;
 
       // Only assign positions if they don't already have them from the server
-      if (node.x === undefined || node.y === undefined || node.z === undefined) {
+      if (node._targetX === undefined) {
+        let tx, ty, tz;
         if (isConn) {
           // Spawn near center
-          node.x = (Math.random() - 0.5) * centerRadius * 2;
-          node.y = (Math.random() - 0.5) * centerRadius * 2;
-          node.z = (Math.random() - 0.5) * centerRadius * 2;
+          tx = (Math.random() - 0.5) * centerRadius * 2;
+          ty = (Math.random() - 0.5) * centerRadius * 2;
+          tz = (Math.random() - 0.5) * centerRadius * 2;
         } else {
           // Spread around the connected core
           const theta = Math.random() * Math.PI * 2;
           const phi = Math.acos(2 * Math.random() - 1);
           const r = outerMin + Math.random() * (outerMax - outerMin);
-          node.x = r * Math.sin(phi) * Math.cos(theta);
-          node.y = r * Math.sin(phi) * Math.sin(theta);
-          node.z = r * Math.cos(phi);
+          tx = r * Math.sin(phi) * Math.cos(theta);
+          ty = r * Math.sin(phi) * Math.sin(theta);
+          tz = r * Math.cos(phi);
         }
+        
+        node._targetX = tx;
+        node._targetY = ty;
+        node._targetZ = tz;
+        
+        // Start all at a single point for the big bang effect
+        // Using fx, fy, fz makes them immune to physics, but they will still be rendered
+        node.fx = 0;
+        node.fy = 0;
+        node.fz = 0;
+        
+        animate(node, {
+          fx: tx,
+          fy: ty,
+          fz: tz,
+          duration: 3000 + Math.random() * 2000, // Organic settling time
+          delay: 0, // No delay, all burst out immediately from the "single node"
+          ease: 'easeOutQuint' // Buttery smooth deceleration
+        });
       }
     }
 
@@ -197,7 +223,7 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
   const edgeCount = displayData.links?.length || 0;
 
   return (
-    <div className="fixed inset-0 z-0" style={{ background: '#F4F5F7' }}>
+    <div className="fixed inset-0 z-0 transition-colors duration-300" style={{ background: isDark ? '#000000' : '#F4F5F7' }}>
       <ForceGraph3D
         ref={fgRef}
         graphData={displayData}
@@ -214,7 +240,7 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
           const srcName = typeof link.source === 'object' ? (link.source.name || `Row #${link.source.id}`) : `Node ${link.source}`;
           const tgtName = typeof link.target === 'object' ? (link.target.name || `Row #${link.target.id}`) : `Node ${link.target}`;
           const edgeType = link.type || 'Unknown';
-          const color = EDGE_COLORS[edgeType] || DEFAULT_EDGE_COLOR;
+          const color = isDark ? (edgeType === 'Shared Device' ? '#2DD4BF' : edgeType === 'Shared IP' ? '#A855F7' : edgeType === 'Shared UPI' ? '#FACC15' : '#60A5FA') : (EDGE_COLORS[edgeType] || DEFAULT_EDGE_COLOR);
           return `
             <div style="background: rgba(15, 35, 80, 0.92); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); font-family: 'SF Pro Display', -apple-system, sans-serif; backdrop-filter: blur(8px); min-width: 160px;">
               <div style="color: ${color}; font-weight: 700; font-size: 12px; margin-bottom: 6px; letter-spacing: 0.03em;">${edgeType}</div>
@@ -227,15 +253,15 @@ const NetworkBackground = ({ graphData, onNodeClick }) => {
         linkWidth={0.3}
         linkOpacity={0.15}
         nodeRelSize={2}
-        backgroundColor="#F4F5F7"
+        backgroundColor={isDark ? '#000000' : '#F4F5F7'}
         showNavInfo={false}
         enableNodeDrag={false}
         enableNavigationControls={false}
         enablePointerInteraction={true}
         onNodeClick={onNodeClick || undefined}
-        cooldownTicks={0}
+        cooldownTicks={Infinity}
         warmupTicks={0}
-        d3AlphaDecay={1}
+        d3AlphaDecay={0}
         d3VelocityDecay={1}
         d3AlphaMin={0.005}
         width={window.innerWidth}

@@ -36,8 +36,8 @@ from engines.engine_b.dataset import (
 )
 
 # Training hyperparameters
-GAT_EPOCHS = 10
-GAT_LR = 0.005
+GAT_EPOCHS = 30
+GAT_LR = 0.003
 BATCH_SIZE = 256
 PATIENCE = 5
 
@@ -238,7 +238,7 @@ def train(financial_df: pd.DataFrame, fraud_df: pd.DataFrame) -> dict:
     print(f"  Using device: {device}")
     if device.type == 'cuda':
         print(f"  GPU: {torch.cuda.get_device_name(0)}")
-        mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+        mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         print(f"  GPU Memory: {mem_gb:.1f} GB")
 
     df = pd.merge(financial_df, fraud_df, on='Customer_ID', how='inner')
@@ -253,10 +253,10 @@ def train(financial_df: pd.DataFrame, fraud_df: pd.DataFrame) -> dict:
     G = _build_nx_graph(hetero_data, n_nodes)
     graph_feats, graph_feat_names = _compute_graph_features(G, n_nodes)
 
-    # Pre-compute 3D layout
+    # Pre-compute 3D layout (use fast random layout — spring_layout is O(V^2) and blocks startup)
     print("  Pre-computing 3D layout coordinates...")
-    pos_3d = nx.spring_layout(G, dim=3, k=1.0/np.sqrt(len(G.nodes())), iterations=50, seed=42)
-    node_positions = {int(node): {'x': float(coords[0]) * 500, 'y': float(coords[1]) * 500, 'z': float(coords[2]) * 500} for node, coords in pos_3d.items()}
+    rng = np.random.RandomState(42)
+    node_positions = {int(node): {'x': float(rng.uniform(-500, 500)), 'y': float(rng.uniform(-500, 500)), 'z': float(rng.uniform(-500, 500))} for node in G.nodes()}
 
     # Step 3: Train/test split
     y = df['Target_Default'].values
@@ -273,7 +273,15 @@ def train(financial_df: pd.DataFrame, fraud_df: pd.DataFrame) -> dict:
 
     # Step 5: Combine features
     print("  Step 4: Combining tabular + graph + GNN embeddings...")
-    X_tab = tab_scaler.transform(df[TABULAR_FEATURES].fillna(0).values)
+    X_tab_raw = df[TABULAR_FEATURES].fillna(df[TABULAR_FEATURES].median()).values
+    scaler_tab = StandardScaler()
+    X_tab = scaler_tab.fit_transform(X_tab_raw)
+
+    # Re-introduce advanced features that Engine A was denied
+    ADVANCED_FEATURES = ['CIBIL_Score', 'Utility_Payment_Consistency', 'Salary_Deposit_Regularity', 'Interest_Rate']
+    X_adv = df[ADVANCED_FEATURES].fillna(df[ADVANCED_FEATURES].median()).values
+    scaler_adv = StandardScaler()
+    X_adv_scaled = scaler_adv.fit_transform(X_adv)
 
     scaler_gnn = StandardScaler()
     gnn_scaled = scaler_gnn.fit_transform(gnn_embeddings)
@@ -281,10 +289,11 @@ def train(financial_df: pd.DataFrame, fraud_df: pd.DataFrame) -> dict:
     scaler_graph = StandardScaler()
     graph_scaled = scaler_graph.fit_transform(graph_feats)
 
-    X_combined = np.hstack([X_tab, graph_scaled, gnn_scaled])
+    X_combined = np.hstack([X_tab, X_adv_scaled, graph_scaled, gnn_scaled])
 
     all_feature_names = (
         TABULAR_FEATURES
+        + ADVANCED_FEATURES
         + graph_feat_names
         + [f'gnn_embedding_{i}' for i in range(EMBEDDING_DIM)]
     )
@@ -300,17 +309,18 @@ def train(financial_df: pd.DataFrame, fraud_df: pd.DataFrame) -> dict:
     y_test = y[test_idx]
 
     xgb_model = xgb.XGBClassifier(
-        n_estimators=200,
-        max_depth=6,
-        learning_rate=0.1,
+        n_estimators=100,
+        max_depth=4,
+        learning_rate=0.05,
         subsample=0.8,
         colsample_bytree=0.8,
-        reg_lambda=1.0,
-        reg_alpha=0.1,
+        reg_lambda=5.0,
+        reg_alpha=0.5,
+        min_child_weight=5,
+        gamma=0.3,
         scale_pos_weight=len(y_train[y_train == 0]) / max(len(y_train[y_train == 1]), 1),
         random_state=42,
         eval_metric='logloss',
-        use_label_encoder=False,
     )
 
     xgb_model.fit(X_train, y_train, verbose=False)

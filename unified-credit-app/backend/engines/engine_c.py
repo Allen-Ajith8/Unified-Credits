@@ -66,20 +66,18 @@ def run(financial_df, fraud_df) -> dict:
     unchanged = int(len(score_deltas) - improved - worsened)
     
     # Cluster comparison
-    cluster_comparison = []
-    if "inClusterDefaultRate" in metrics_b:
-        cluster_comparison = [
-            {
-                "name": "Inside Default Cluster",
-                "engineA": round(metrics_a["defaultRate"], 2),
-                "engineB": round(metrics_b.get("inClusterDefaultRate", 0), 2),
-            },
-            {
-                "name": "Outside Default Cluster",
-                "engineA": round(metrics_a["defaultRate"], 2),
-                "engineB": round(metrics_b.get("outClusterDefaultRate", 0), 2),
-            },
-        ]
+    cluster_comparison = [
+        {
+            "name": "Inside Default Cluster",
+            "engineA": round(metrics_a.get("defaultRate", 0), 2),
+            "engineB": round(metrics_b.get("inClusterDefaultRate", 0), 2),
+        },
+        {
+            "name": "Outside Default Cluster",
+            "engineA": round(metrics_a.get("defaultRate", 0), 2),
+            "engineB": round(metrics_b.get("outClusterDefaultRate", 0), 2),
+        },
+    ]
     
     delta_result = {
         "name": "Comparative Analysis",

@@ -21,11 +21,10 @@ warnings.filterwarnings("ignore")
 
 # The standard tabular features
 TABULAR_FEATURES = [
-    'Age', 'CIBIL_Score', 'Verified_Monthly_Income', 'Debt_to_Income_Ratio',
-    'Utility_Payment_Consistency', 'Loan_Amount', 'Loan_Term_Months',
-    'Interest_Rate', 'Num_Past_Defaults', 'Num_Active_Loans',
-    'Credit_History_Months', 'Savings_Balance', 'EMI_Bounce_Count',
-    'Credit_Utilization_Pct', 'Salary_Deposit_Regularity'
+    'Age', 'Verified_Monthly_Income', 'Debt_to_Income_Ratio',
+    'Loan_Amount', 'Loan_Term_Months', 'Num_Past_Defaults',
+    'Num_Active_Loans', 'Credit_History_Months', 'Savings_Balance',
+    'EMI_Bounce_Count', 'Credit_Utilization_Pct'
 ]
 
 
@@ -42,7 +41,9 @@ def run(df: pd.DataFrame) -> dict:
     print("[Engine A] Starting Legacy Tabular XGBoost...")
     
     # Prepare features and target
-    X = df[TABULAR_FEATURES].fillna(0).copy()
+    X = df[TABULAR_FEATURES].copy()
+    feature_medians = X.median()
+    X = X.fillna(feature_medians)
     y = df['Target_Default'].values
     
     # Scale features
@@ -58,17 +59,18 @@ def run(df: pd.DataFrame) -> dict:
     
     # XGBoost classifier
     model = xgb.XGBClassifier(
-        n_estimators=200,
-        max_depth=6,
-        learning_rate=0.1,
+        n_estimators=100,
+        max_depth=4,
+        learning_rate=0.05,
         subsample=0.8,
         colsample_bytree=0.8,
-        reg_lambda=1.0,       # L2 regularization
-        reg_alpha=0.1,        # L1 regularization
+        reg_lambda=5.0,       # L2 regularization
+        reg_alpha=0.5,        # L1 regularization
+        min_child_weight=5,
+        gamma=0.3,
         scale_pos_weight=len(y_train[y_train == 0]) / max(len(y_train[y_train == 1]), 1),
         random_state=42,
         eval_metric='logloss',
-        use_label_encoder=False,
     )
     
     model.fit(X_train, y_train, verbose=False)
@@ -78,7 +80,7 @@ def run(df: pd.DataFrame) -> dict:
     y_prob = model.predict_proba(X_test)[:, 1]
     
     # Full dataset predictions (for per-node comparison)
-    X_full_scaled = scaler.transform(df[TABULAR_FEATURES].fillna(0))
+    X_full_scaled = scaler.transform(df[TABULAR_FEATURES].fillna(feature_medians))
     full_probs = model.predict_proba(X_full_scaled)[:, 1]
     full_preds = model.predict(X_full_scaled)
     
