@@ -221,26 +221,45 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
     return () => cancelAnimationFrame(rafId);
   }, []);
 
-  // Toggle interactive controls (zoom, pan, rotate)
+  // Toggle interactive controls (zoom, pan, rotate) and autoRotate
   useEffect(() => {
-    if (!fgRef.current) return;
-    const controls = fgRef.current.controls();
-    if (controls) {
-      // 1. Controls must be active for the render loop to process them
-      controls.enabled = true;
-      
-      // 2. Turn on native auto-rotation for the cinematic spin
-      controls.autoRotate = true;
-      controls.autoRotateSpeed = 0.6; // Matches the previous slow spin speed
+    let checkInterval;
+    const configureControls = () => {
+      if (!fgRef.current) return false;
+      const controls = fgRef.current.controls();
+      if (controls) {
+        // 1. Controls must be active for the render loop to process them
+        controls.enabled = true;
+        
+        // 2. Turn on native auto-rotation for the cinematic spin (active everywhere)
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.6; 
 
-      // 3. Conditionally allow the user to grab/zoom based on view mode
-      controls.enableZoom = !!isInteractive;
-      controls.enablePan = !!isInteractive;
-      controls.enableRotate = !!isInteractive;
+        // 3. Conditionally allow the user to grab/zoom based on view mode
+        controls.enableZoom = !!isInteractive;
+        controls.enablePan = !!isInteractive;
+        controls.enableRotate = !!isInteractive;
 
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.1;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.1;
+        return true;
+      }
+      return false;
+    };
+
+    // Try immediately
+    if (!configureControls()) {
+      // If controls aren't ready yet, poll for them (they instantiate shortly after mount)
+      checkInterval = setInterval(() => {
+        if (configureControls()) {
+          clearInterval(checkInterval);
+        }
+      }, 100);
     }
+
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+    };
   }, [isInteractive]);
 
   // Set initial camera position once (so it's not super close before zoomToFit fires)
@@ -426,7 +445,7 @@ const NetworkBackground = ({ graphData, onNodeClick, isInteractive }) => {
         nodeVisibility={false}
         linkVisibility={false}
         onEngineTick={syncInstancedMeshes}
-        enableNavigationControls={!!isInteractive}
+        enableNavigationControls={true}
         enableNodeDrag={false}
         enablePointerInteraction={false}
         backgroundColor={isDark ? '#000000' : '#F4F5F7'}
