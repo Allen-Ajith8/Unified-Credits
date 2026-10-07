@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title Unified Credit Engine Launcher
 echo ========================================================
 echo Starting Unified Credit Engine (Backend and Frontend)...
@@ -8,14 +9,14 @@ echo.
 :: 1. Start the Backend
 echo [1/2] Launching Python FastAPI Backend...
 if exist "backend\.venv\Scripts\activate.bat" (
-    start "Unified Credit Backend" cmd /k "cd backend && call .venv\Scripts\activate.bat && python -u main.py"
+    start cmd /k "cd backend && call .venv\Scripts\activate.bat && python -u main.py"
 ) else (
-    start "Unified Credit Backend" cmd /k "cd backend && python -u main.py"
+    start cmd /k "cd backend && python -u main.py"
 )
 
 :: 2. Start the Frontend
 echo [2/2] Launching React Vite Frontend...
-start "Unified Credit Frontend" cmd /k "cd frontend && npm run dev"
+start cmd /k "cd frontend && npm run dev"
 
 echo.
 echo ========================================================
