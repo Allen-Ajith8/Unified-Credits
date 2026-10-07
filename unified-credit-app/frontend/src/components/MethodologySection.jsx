@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, useScroll, useInView } from 'framer-motion';
 import { AnimatedTitle } from './AnimatedTitle';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
-import { Workflow, Network, ShieldCheck } from 'lucide-react';
+import { Workflow, Network, ShieldCheck, Landmark } from 'lucide-react';
 import { engineMetrics } from '../data/dashboardMetrics';
 import { useTheme } from 'next-themes';
 
@@ -14,7 +14,7 @@ const MethodologySection = ({ activeMode }) => {
 
   const sectionRef = useRef(null);
   const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
-  const [activeIndex, setActiveIndex] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const activeData = activeMode === 'c' ? engineMetrics.b : engineMetrics[activeMode];
 
@@ -115,6 +115,33 @@ const MethodologySection = ({ activeMode }) => {
         </ResponsiveContainer>
       ),
     },
+    {
+      num: '004',
+      icon: <Landmark className="w-7 h-7" />,
+      title: 'Indian Regulatory Compliance',
+      subtitle: 'Static Tables vs Graphical AI',
+      desc: "In India's highly regulated landscape, traditional credit scoring is restricted to static tabular data (like CIBIL scores) which often misses sophisticated fraud. By converting static tables into dynamic graphical networks using Advanced AI (GNNs & GAN architectures), we evaluate risk through hidden relationships (shared UPIs, devices), catching fraud while maintaining strict RBI compliance.",
+      highlights: [
+        { label: 'Traditional', value: 'Static CIBIL' },
+        { label: 'Next-Gen', value: 'Graphical AI' },
+        { label: 'Key Focus', value: 'RBI Compliance' },
+      ],
+      chart: (
+        <div className="flex flex-col gap-4 w-full h-full justify-center px-4">
+          <div className="bg-[#0F2350]/5 dark:bg-white/5 border border-[#0F2350]/10 dark:border-white/10 rounded-xl p-5 flex flex-col gap-2">
+            <span className="text-[#0F2350] dark:text-white font-semibold text-sm uppercase tracking-wide">Legacy Systems</span>
+            <span className="text-[#86868B] text-xs">Isolated, static table rows evaluating individuals in a vacuum. Vulnerable to coordinated fraud rings.</span>
+          </div>
+          <div className="flex justify-center">
+            <div className="h-6 w-[1px] bg-gradient-to-b from-[#0F2350]/20 to-[#0071E3] dark:from-white/20 dark:to-[#0071E3]" />
+          </div>
+          <div className="bg-[#0071E3]/10 border border-[#0071E3]/20 rounded-xl p-5 flex flex-col gap-2">
+            <span className="text-[#0F2350] dark:text-white font-semibold text-sm uppercase tracking-wide">Unified Credit Engine</span>
+            <span className="text-[#86868B] text-xs">Multi-dimensional graphical mapping using GNNs/GANs to expose hidden relationships safely and accurately.</span>
+          </div>
+        </div>
+      ),
+    },
   ];
 
 
@@ -141,7 +168,6 @@ const MethodologySection = ({ activeMode }) => {
       >
         <div 
           className="flex w-full items-center justify-center gap-4 px-6 mx-auto h-[600px] md:h-[500px]"
-          onMouseLeave={() => setActiveIndex(null)}
         >
           {pillars.map((pillar, index) => (
             <motion.div
