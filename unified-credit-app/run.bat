@@ -21,7 +21,9 @@ start cmd /k "cd frontend && npm run dev"
 echo.
 echo ========================================================
 echo Services are booting up in separate terminal windows!
-echo Please wait a moment for the AI engines to initialize.
-echo.
-echo Access the website at: http://localhost:5173
+echo Please wait while the AI engines initialize...
 echo ========================================================
+echo.
+echo Opening your browser automatically...
+timeout /t 3 /nobreak >nul
+start http://localhost:5173
