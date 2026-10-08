@@ -101,10 +101,14 @@ const DashboardCard = ({ liveData, onGraphUpdate, activeMode, setActiveMode, api
         { icon: MinusCircle, label: 'False Positives Reduced', value: activeData.metrics?.falsePositivesReduced || 0, badge: 'Efficiency', badgeColor: 'bg-[#0F2350]/15 text-[#0F2350] dark:text-white' },
       ];
     } else {
+      const activeRocAuc = activeMode === 'a' 
+        ? (liveData.running_roc_auc_a?.toFixed(4) || activeData.metrics?.rocAuc?.toFixed(4))
+        : (liveData.running_roc_auc_b?.toFixed(4) || activeData.metrics?.rocAuc?.toFixed(4));
+
       return [
         { icon: Zap, label: 'Total Processed', value: liveData.total_processed?.toLocaleString() || activeData.metrics?.totalProcessed?.toLocaleString() || '0', badge: 'Live', badgeColor: 'bg-[#006A67]/15 text-[#006A67]' },
         { icon: Activity, label: 'Default Rate', value: `${liveData.running_default_rate?.toFixed(2) || activeData.metrics?.defaultRate?.toFixed(2) || '0.00'}%`, badge: 'Running Avg', badgeColor: 'bg-[#4A2C76]/15 text-[#4A2C76]' },
-        { icon: ShieldCheck, label: 'ROC-AUC Score', value: liveData.running_roc_auc?.toFixed(4) || activeData.metrics?.rocAuc?.toFixed(4) || '0.0000', badge: activeMode === 'a' ? 'Legacy Model' : 'Hybrid Model', badgeColor: 'bg-[#0F2350]/15 text-[#0F2350] dark:text-white' },
+        { icon: ShieldCheck, label: 'ROC-AUC Score', value: activeRocAuc || '0.0000', badge: activeMode === 'a' ? 'Legacy Model' : 'Hybrid Model', badgeColor: 'bg-[#0F2350]/15 text-[#0F2350] dark:text-white' },
         { icon: AlertTriangle, label: 'Fraud Alerts', value: liveData.fraud_alerts || '0', badge: 'Review', badgeColor: 'bg-[#D4AF37]/15 text-[#D4AF37]' },
       ];
     }

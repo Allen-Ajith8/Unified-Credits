@@ -462,7 +462,8 @@ async def websocket_live_metrics(ws: WebSocket):
                 "type": "initial",
                 "total_processed": len(current_df) if current_df is not None else 0,
                 "running_default_rate": engine_results["a"]["metrics"]["defaultRate"] if engine_results["a"] else 0,
-                "running_roc_auc": engine_results["b"]["metrics"]["rocAuc"] if engine_results["b"] else (engine_results["a"]["metrics"]["rocAuc"] if engine_results["a"] else 0),
+                "running_roc_auc_a": engine_results["a"]["metrics"]["rocAuc"] if engine_results["a"] else 0,
+                "running_roc_auc_b": engine_results["b"]["metrics"]["rocAuc"] if engine_results["b"] else 0,
                 "fraud_alerts": engine_results["c"]["metrics"]["falseNegativesCaught"] if engine_results["c"] else 0,
             })
         
@@ -478,7 +479,8 @@ async def websocket_live_metrics(ws: WebSocket):
                         "type": "heartbeat",
                         "total_processed": len(current_df) if current_df is not None else 0,
                         "running_default_rate": engine_results["a"]["metrics"]["defaultRate"] if engine_results["a"] else 0,
-                        "running_roc_auc": engine_results["b"]["metrics"]["rocAuc"] if engine_results["b"] else (engine_results["a"]["metrics"]["rocAuc"] if engine_results["a"] else 0),
+                        "running_roc_auc_a": engine_results["a"]["metrics"]["rocAuc"] if engine_results["a"] else 0,
+                        "running_roc_auc_b": engine_results["b"]["metrics"]["rocAuc"] if engine_results["b"] else 0,
                         "fraud_alerts": engine_results["c"]["metrics"]["falseNegativesCaught"] if engine_results["c"] else 0,
                     })
     
